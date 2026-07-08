@@ -64,6 +64,42 @@ type PriorityMeta = Record<
 
 type ThemeMode = 'light' | 'dark'
 
+const EyeIcon = ({ size = 16 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ display: 'block' }}
+  >
+    <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0Z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+)
+
+const EyeClosedIcon = ({ size = 16 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ display: 'block' }}
+  >
+    <path d="M3 10a9 9 0 0 0 18 0" />
+    <path d="M12 19v-4" />
+    <path d="m4.93 14 2.83-2.83" />
+    <path d="m19.07 14-2.83-2.83" />
+  </svg>
+)
+
 type Theme = {
   pageBg: string
   surface: string
@@ -311,52 +347,174 @@ function StatusDot({ status }: { status: Status }) {
   )
 }
 
-function ProgressBar({ pct }: { pct: number }) {
+
+
+function DeptPipeline({ tasks, theme }: { tasks: Task[]; theme: Theme }) {
+  const activeIndex = tasks.findIndex((task) => task.status === 'In Progress' || task.status === 'On Hold')
+  const completedCount = tasks.filter((task) => task.status === 'Completed' || task.status === 'Dispatched').length
+  const progressPercent = tasks.length > 1 ? (completedCount / (tasks.length - 1)) * 100 : 0
+
   return (
-    <div
-      style={{
-        background: '#E5E7EB',
-        borderRadius: 4,
-        height: 6,
-        overflow: 'hidden',
-        width: '100%',
-      }}
-    >
+    <div style={{ position: 'relative', padding: '16px 8px 10px 8px', marginTop: 10 }}>
+      {/* Background track line */}
       <div
         style={{
-          width: `${pct}%`,
-          background: pct === 100 ? '#10B981' : '#3B82F6',
-          height: '100%',
-          transition: 'width 0.4s',
+          position: 'absolute',
+          left: 20,
+          right: 20,
+          top: 24,
+          height: 4,
+          background: theme.border,
+          borderRadius: 2,
+          zIndex: 1,
         }}
       />
-    </div>
-  )
-}
+      
+      {/* Progress completeness line overlapping */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 20,
+          top: 24,
+          height: 4,
+          background: '#10B981',
+          width: `calc(${progressPercent}% - 4px)`,
+          borderRadius: 2,
+          zIndex: 1,
+          transition: 'width 0.4s ease-out',
+        }}
+      />
 
-function DeptPipeline({ tasks }: { tasks: Task[] }) {
-  return (
-    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-      {tasks.map((task) => {
-        const meta = STATUS_META[task.status]
+      {/* Nodes */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', zIndex: 2 }}>
+        {tasks.map((task, index) => {
+          const isCompleted = task.status === 'Completed' || task.status === 'Dispatched'
+          const isInProgress = task.status === 'In Progress'
+          const isOnHold = task.status === 'On Hold'
+          const isActive = index === activeIndex || (activeIndex === -1 && index === tasks.length - 1 && isCompleted)
+          
+          let dotColor = '#E5E7EB'
+          let borderColor = theme.border
+          let labelColor = theme.textSoft
+          let scale = 1
+          let pulseClass = false
+          
+          if (isCompleted) {
+            dotColor = '#10B981'
+            borderColor = '#10B981'
+            labelColor = theme.text
+          } else if (isInProgress) {
+            dotColor = '#3B82F6'
+            borderColor = '#3B82F6'
+            labelColor = '#3B82F6'
+            scale = 1.15
+            pulseClass = true
+          } else if (isOnHold) {
+            dotColor = '#EF4444'
+            borderColor = '#EF4444'
+            labelColor = '#EF4444'
+            scale = 1.15
+            pulseClass = true
+          }
 
-        return (
-          <div
-            key={task.dept}
-            style={{
-              background: meta.bg,
-              color: meta.color,
-              borderRadius: 4,
-              padding: '3px 8px',
-              fontSize: 10,
-              fontWeight: 700,
-              border: `1px solid ${meta.dot}22`,
-            }}
-          >
-            {task.dept}
-          </div>
-        )
-      })}
+          let shortName = ''
+          if (task.dept === 'Sales') shortName = 'SL'
+          else if (task.dept === 'Design') shortName = 'DS'
+          else if (task.dept === 'Procurement') shortName = 'PR'
+          else if (task.dept === 'Production') shortName = 'PD'
+          else if (task.dept === 'QC') shortName = 'QC'
+          else if (task.dept === 'Dispatch') shortName = 'DP'
+
+          return (
+            <div
+              key={task.dept}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                position: 'relative',
+              }}
+            >
+              {/* Active status bubble/label above node */}
+              {isActive && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: -24,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    whiteSpace: 'nowrap',
+                    background: isOnHold ? '#EF4444' : isInProgress ? '#3B82F6' : '#10B981',
+                    color: '#fff',
+                    fontSize: 8,
+                    fontWeight: 900,
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                    textTransform: 'uppercase',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    zIndex: 3,
+                    animation: pulseClass ? 'bounce-active 1.5s infinite alternate ease-in-out' : 'none',
+                  }}
+                >
+                  {isOnHold ? 'ON HOLD' : isInProgress ? 'CURRENTLY HERE' : 'DISPATCHED'}
+                </div>
+              )}
+
+              {/* Node dot */}
+              <div
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: '50%',
+                  background: dotColor,
+                  border: `2.5px solid ${isActive ? '#fff' : borderColor}`,
+                  boxShadow: isActive ? '0 0 10px rgba(0,0,0,0.15)' : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 9,
+                  fontWeight: 900,
+                  color: isCompleted ? '#fff' : isActive ? '#fff' : theme.textSoft,
+                  transform: `scale(${scale})`,
+                  transition: 'all 0.3s ease',
+                  zIndex: 2,
+                }}
+              >
+                {isCompleted ? (
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ display: 'block' }}
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                ) : (
+                  shortName
+                )}
+              </div>
+
+              {/* Node label */}
+              <span
+                style={{
+                  fontSize: 9,
+                  fontWeight: isActive ? 800 : 600,
+                  color: labelColor,
+                  marginTop: 6,
+                  letterSpacing: '0.02em',
+                }}
+              >
+                {task.dept}
+              </span>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -512,14 +670,18 @@ function LoginScreen({
               border: `1px solid ${theme.border}`,
               background: theme.surfaceAlt,
               color: theme.textMuted,
-              borderRadius: 999,
-              padding: '7px 12px',
-              fontSize: 12,
-              fontWeight: 700,
+              borderRadius: '50%',
+              width: 32,
+              height: 32,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               cursor: 'pointer',
             }}
+            title={themeMode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            aria-label={themeMode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
-            {themeMode === 'dark' ? 'Light' : 'Dark'}
+            {themeMode === 'dark' ? <EyeClosedIcon size={14} /> : <EyeIcon size={14} />}
           </button>
         </div>
 
@@ -1454,14 +1616,18 @@ export default function App() {
               background: theme.surfaceAlt,
               color: theme.textMuted,
               border: `1px solid ${theme.headerBorder}`,
-              borderRadius: 999,
-              padding: '7px 12px',
-              fontWeight: 700,
-              fontSize: 12,
+              borderRadius: '50%',
+              width: 32,
+              height: 32,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               cursor: 'pointer',
             }}
+            title={themeMode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            aria-label={themeMode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
-            {themeMode === 'dark' ? 'Light Mode' : 'Dark Mode'}
+            {themeMode === 'dark' ? <EyeClosedIcon size={14} /> : <EyeIcon size={14} />}
           </button>
           <div style={{ textAlign: 'right' }}>
             <div style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>{currentUser.name}</div>
@@ -1712,14 +1878,10 @@ export default function App() {
 
                 <div style={{ marginTop: 14 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                    <span style={{ fontSize: 11, color: theme.textSoft, fontWeight: 600 }}>PROGRESS</span>
+                    <span style={{ fontSize: 11, color: theme.textSoft, fontWeight: 600 }}>PRODUCTION COMPLETENESS</span>
                     <span style={{ fontSize: 11, color: theme.textMuted, fontWeight: 700 }}>{pct}%</span>
                   </div>
-                  <ProgressBar pct={pct} />
-                </div>
-
-                <div style={{ marginTop: 12 }}>
-                  <DeptPipeline tasks={order.tasks} />
+                  <DeptPipeline tasks={order.tasks} theme={theme} />
                 </div>
 
                 {(activeTasks.length > 0 || holdTasks.length > 0) && (
