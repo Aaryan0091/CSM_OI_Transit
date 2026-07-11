@@ -14,6 +14,7 @@ export type Company = 'CSM' | 'Oriental'
 export type User = {
   uid: string
   email: string
+  emailVerified: boolean
   name: string
   dept: UserDepartment
 }

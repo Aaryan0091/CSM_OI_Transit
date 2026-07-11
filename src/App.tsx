@@ -15,11 +15,18 @@ import { useOrdersData } from './hooks/useOrdersData'
 export default function App() {
   const {
     authError,
+    authMessage,
     currentUser,
     handleLogin,
+    handlePasswordReset,
+    handleRefreshVerification,
+    handleSendVerificationEmail,
     handleSignOut,
     handleSignup,
     isCheckingAuth,
+    isRefreshingVerification,
+    isSendingVerification,
+    pendingVerificationEmail,
     setThemeMode,
     themeMode,
   } = useAuthSession()
@@ -73,10 +80,18 @@ export default function App() {
     return (
       <LoginScreen
         onLogin={handleLogin}
+        onPasswordReset={handlePasswordReset}
+        onRefreshVerification={handleRefreshVerification}
+        onResendVerification={handleSendVerificationEmail}
+        onSignOut={handleSignOut}
         onSignup={handleSignup}
+        pendingVerificationEmail={pendingVerificationEmail}
+        isRefreshingVerification={isRefreshingVerification}
+        isSendingVerification={isSendingVerification}
         themeMode={themeMode}
         onToggleTheme={() => setThemeMode((previous) => (previous === 'light' ? 'dark' : 'light'))}
         externalError={authError}
+        externalMessage={authMessage}
       />
     )
   }
@@ -115,6 +130,10 @@ export default function App() {
 
       {syncError && (
         <StatusBanner message={syncError} tone="error" theme={theme} />
+      )}
+
+      {authMessage && (
+        <StatusBanner message={authMessage} tone="info" theme={theme} />
       )}
 
       {requestError && (

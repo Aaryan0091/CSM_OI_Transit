@@ -8,19 +8,35 @@ import type { Department, ThemeMode } from '../../types'
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export function LoginScreen({
+  externalMessage,
   onLogin,
+  onPasswordReset,
+  onRefreshVerification,
+  onResendVerification,
+  onSignOut,
   onSignup,
+  pendingVerificationEmail,
+  isRefreshingVerification,
+  isSendingVerification,
   themeMode,
   onToggleTheme,
   externalError,
 }: {
+  externalMessage: string | null
   onLogin: (email: string, password: string) => Promise<string | null>
+  onPasswordReset: (email: string) => Promise<string | null>
+  onRefreshVerification: () => Promise<string | null>
+  onResendVerification: () => Promise<string | null>
+  onSignOut: () => Promise<void>
   onSignup: (payload: {
     name: string
     dept: Department
     email: string
     password: string
   }) => Promise<string | null>
+  pendingVerificationEmail: string | null
+  isRefreshingVerification: boolean
+  isSendingVerification: boolean
   themeMode: ThemeMode
   onToggleTheme: () => void
   externalError: string | null
@@ -33,6 +49,7 @@ export function LoginScreen({
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const theme = THEMES[themeMode]
@@ -42,11 +59,15 @@ export function LoginScreen({
   const passwordFieldId = `${mode}-password`
   const confirmPasswordFieldId = 'signup-confirm-password'
   const errorMessageId = `${mode}-auth-error`
+  const successMessageId = `${mode}-auth-message`
+  const isVerificationPending = Boolean(pendingVerificationEmail)
+  const isBusy = isSubmitting || isRefreshingVerification || isSendingVerification
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
     setIsSubmitting(true)
+    setMessage('')
     let nextError: string | null
     const normalizedEmail = email.trim()
 
@@ -83,6 +104,60 @@ export function LoginScreen({
     }
 
     setError(nextError)
+  }
+
+  const handlePasswordResetClick = async () => {
+    const normalizedEmail = email.trim()
+
+    setMessage('')
+
+    if (!normalizedEmail) {
+      setError(AUTH_COPY.workEmailMissing)
+      return
+    }
+
+    if (!EMAIL_PATTERN.test(normalizedEmail)) {
+      setError('Please enter a valid email address.')
+      return
+    }
+
+    setIsSubmitting(true)
+    const nextError = await onPasswordReset(normalizedEmail)
+    setIsSubmitting(false)
+
+    if (nextError) {
+      setError(nextError)
+      return
+    }
+
+    setError('')
+    setMessage(AUTH_COPY.passwordResetSent)
+  }
+
+  const handleResendVerificationClick = async () => {
+    setError('')
+    setMessage('')
+
+    const nextError = await onResendVerification()
+
+    if (nextError) {
+      setError(nextError)
+      return
+    }
+
+    setMessage(AUTH_COPY.emailVerificationSent)
+  }
+
+  const handleRefreshVerificationClick = async () => {
+    setError('')
+    setMessage('')
+
+    const nextError = await onRefreshVerification()
+
+    if (nextError) {
+      setError(nextError)
+      return
+    }
   }
 
   return (
@@ -203,6 +278,7 @@ export function LoginScreen({
                 setSlideDirection(option.key === 'signup' ? 'left' : 'right')
                 setMode(option.key)
                 setError('')
+                setMessage('')
               }}
               style={{
                 position: 'relative',
@@ -230,6 +306,89 @@ export function LoginScreen({
             willChange: 'transform, opacity',
           }}
         >
+          {isVerificationPending ? (
+            <div style={{ display: 'grid', gap: 14 }}>
+              <div
+                style={{
+                  padding: '14px 16px',
+                  borderRadius: 12,
+                  background: theme.surfaceAlt,
+                  border: `1px solid ${theme.border}`,
+                }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 800, color: theme.text }}>
+                  Waiting for email verification
+                </div>
+                <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.6, color: theme.textSoft }}>
+                  We kept your session active for <strong style={{ color: theme.text }}>{pendingVerificationEmail}</strong>.
+                  Open the verification link from your inbox, then come back here and confirm it.
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleRefreshVerificationClick}
+                disabled={isBusy}
+                style={{
+                  width: '100%',
+                  padding: '11px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: theme.primary,
+                  color: theme.primaryText,
+                  fontWeight: 700,
+                  fontSize: 14,
+                  cursor: isBusy ? 'wait' : 'pointer',
+                  opacity: isBusy ? 0.8 : 1,
+                }}
+              >
+                {isRefreshingVerification ? 'Checking verification...' : 'Sign In'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResendVerificationClick}
+                disabled={isBusy}
+                style={{
+                  width: '100%',
+                  padding: '11px',
+                  borderRadius: 8,
+                  border: `1px solid ${theme.border}`,
+                  background: theme.surfaceAlt,
+                  color: theme.text,
+                  fontWeight: 700,
+                  fontSize: 14,
+                  cursor: isBusy ? 'wait' : 'pointer',
+                  opacity: isBusy ? 0.8 : 1,
+                }}
+              >
+                {isSendingVerification ? AUTH_COPY.resendVerificationButton + '...' : AUTH_COPY.resendVerificationButton}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  void onSignOut()
+                }}
+                disabled={isBusy}
+                style={{
+                  width: '100%',
+                  padding: '11px',
+                  borderRadius: 8,
+                  border: `1px solid ${theme.border}`,
+                  background: 'transparent',
+                  color: theme.textSoft,
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: isBusy ? 'wait' : 'pointer',
+                  opacity: isBusy ? 0.8 : 1,
+                }}
+              >
+                Cancel and sign out
+              </button>
+            </div>
+          ) : (
+            <>
           {mode === 'signup' && (
             <>
               <Field label="Name" htmlFor={nameFieldId} theme={theme}>
@@ -333,6 +492,28 @@ export function LoginScreen({
             </div>
           </Field>
 
+          {mode === 'signin' && (
+            <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={handlePasswordResetClick}
+                disabled={isSubmitting}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: theme.primary,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: isSubmitting ? 'wait' : 'pointer',
+                  padding: 0,
+                  opacity: isSubmitting ? 0.8 : 1,
+                }}
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
+
           {mode === 'signup' && (
             <>
               <div style={{ height: 14 }} />
@@ -363,6 +544,17 @@ export function LoginScreen({
               style={{ color: '#DC2626', fontSize: 12, fontWeight: 600, marginTop: 12 }}
             >
               {error || externalError}
+            </div>
+          )}
+
+          {(message || externalMessage) && (
+            <div
+              id={successMessageId}
+              role="status"
+              aria-live="polite"
+              style={{ color: '#166534', fontSize: 12, fontWeight: 600, marginTop: 12 }}
+            >
+              {message || externalMessage}
             </div>
           )}
 
@@ -397,6 +589,8 @@ export function LoginScreen({
               ? AUTH_COPY.departmentSignupHelp
               : AUTH_COPY.profileHelp}
           </div>
+            </>
+          )}
         </div>
       </form>
     </div>

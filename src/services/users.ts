@@ -36,6 +36,7 @@ export async function loadUserProfile(firebaseUser: FirebaseAuthUser): Promise<U
   return {
     uid: firebaseUser.uid,
     email: firebaseUser.email ?? profile.email ?? '',
+    emailVerified: firebaseUser.emailVerified,
     name: profile.name,
     dept: isAdmin ? 'Admin' : profile.dept,
   }

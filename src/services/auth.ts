@@ -2,6 +2,9 @@ import {
   createUserWithEmailAndPassword,
   deleteUser,
   onAuthStateChanged,
+  reload,
+  sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
   type User as FirebaseAuthUser,
@@ -25,7 +28,8 @@ export async function signInWithEmail(email: string, password: string) {
     throw new Error('Firebase Auth is not configured yet.')
   }
 
-  await signInWithEmailAndPassword(auth, email, password)
+  const credential = await signInWithEmailAndPassword(auth, email, password)
+  await reload(credential.user)
 }
 
 export async function signUpWithEmail(payload: {
@@ -50,6 +54,8 @@ export async function signUpWithEmail(payload: {
       dept: payload.dept,
       email: payload.email,
     })
+
+    await sendEmailVerification(credential.user)
   } catch (error) {
     let rollbackSucceeded = false
 
@@ -79,4 +85,29 @@ export async function signOutCurrentUser() {
   }
 
   await signOut(auth)
+}
+
+export async function sendPasswordResetLink(email: string) {
+  if (!auth) {
+    throw new Error('Firebase Auth is not configured yet.')
+  }
+
+  await sendPasswordResetEmail(auth, email)
+}
+
+export async function sendCurrentUserVerificationEmail() {
+  if (!auth?.currentUser) {
+    throw new Error('No signed-in user is available for email verification.')
+  }
+
+  await sendEmailVerification(auth.currentUser)
+}
+
+export async function reloadCurrentAuthUser() {
+  if (!auth?.currentUser) {
+    throw new Error('No signed-in user is available to refresh.')
+  }
+
+  await reload(auth.currentUser)
+  return auth.currentUser
 }
