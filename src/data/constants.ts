@@ -17,8 +17,6 @@ export const DEPARTMENTS: Department[] = [
   'Dispatch',
 ]
 
-export const ADMIN_ACCESS_CODE = import.meta.env.VITE_ADMIN_ACCESS_CODE?.trim() ?? ''
-
 export const STATUS_META: StatusMeta = {
   'In Progress': { color: '#3B82F6', bg: '#DBEAFE', dot: '#3B82F6' },
   'On Hold': { color: '#EF4444', bg: '#FEE2E2', dot: '#EF4444' },

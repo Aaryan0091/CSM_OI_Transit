@@ -1,0 +1,90 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    function isDepartment(value) {
+      return value in ['Sales', 'Design', 'Procurement', 'Production', 'QC', 'Dispatch'];
+    }
+
+    function isValidUserProfile(data) {
+      return data.keys().hasOnly(['name', 'email', 'dept']) &&
+        data.name is string &&
+        data.name.size() >= 2 &&
+        data.email is string &&
+        data.email.size() > 3 &&
+        data.dept is string &&
+        (isDepartment(data.dept) || (isAdmin() && data.dept == 'Admin'));
+    }
+
+    function isOwnProfile(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwnProfile(userId) || isAdmin();
+
+      allow create: if isOwnProfile(userId) &&
+        isValidUserProfile(request.resource.data) &&
+        request.resource.data.dept != 'Admin';
+
+      allow update: if
+        (isAdmin() && isValidUserProfile(request.resource.data)) ||
+        (
+          isOwnProfile(userId) &&
+          isValidUserProfile(request.resource.data) &&
+          request.resource.data.dept == resource.data.dept
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    match /orders/{orderId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isSignedIn();
+    }
+
+    function isValidAdminRequest(data) {
+      return data.keys().hasOnly([
+          'requesterUid',
+          'requesterEmail',
+          'requesterName',
+          'requesterDept',
+          'status',
+          'createdAt',
+          'approvedAt',
+          'approvedBy'
+        ]) &&
+        data.requesterUid is string &&
+        data.requesterEmail is string &&
+        data.requesterName is string &&
+        data.requesterDept is string &&
+        isDepartment(data.requesterDept) &&
+        data.status in ['pending', 'approved', 'rejected'] &&
+        data.createdAt is string;
+    }
+
+    match /adminRequests/{requestId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.requesterUid == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+        request.resource.data.requesterUid == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.approvedAt == null &&
+        request.resource.data.approvedBy == null &&
+        isValidAdminRequest(request.resource.data);
+
+      allow update: if isAdmin() && isValidAdminRequest(request.resource.data);
+
+      allow delete: if isAdmin();
+    }
+  }
+}

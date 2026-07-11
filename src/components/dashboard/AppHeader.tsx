@@ -1,3 +1,4 @@
+import { AUTH_COPY } from '../../data/authCopy'
 import { EyeClosedIcon, EyeIcon } from '../common/Icons'
 import type { Theme, ThemeMode, User } from '../../types'
 
@@ -7,14 +8,18 @@ export function AppHeader({
   themeMode,
   onToggleTheme,
   onOpenNewOrder,
+  onRequestAdminAccess,
   onSignOut,
+  isRequestingAdmin,
 }: {
   currentUser: User
   theme: Theme
   themeMode: ThemeMode
   onToggleTheme: () => void
   onOpenNewOrder: () => void
+  onRequestAdminAccess: () => void
   onSignOut: () => void
+  isRequestingAdmin: boolean
 }) {
   return (
     <div
@@ -87,6 +92,25 @@ export function AppHeader({
             }}
           >
             + New Order
+          </button>
+        )}
+        {currentUser.dept !== 'Admin' && (
+          <button
+            onClick={onRequestAdminAccess}
+            style={{
+              background: '#a8f5e9',
+              color: '#123850',
+              border: 'none',
+              borderRadius: 8,
+              padding: '7px 16px',
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: isRequestingAdmin ? 'wait' : 'pointer',
+              opacity: isRequestingAdmin ? 0.8 : 1,
+            }}
+            disabled={isRequestingAdmin}
+          >
+            {isRequestingAdmin ? 'Sending Request...' : AUTH_COPY.adminRequestButton}
           </button>
         )}
         <button

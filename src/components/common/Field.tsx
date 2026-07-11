@@ -5,16 +5,19 @@ export function Field({
   label,
   children,
   accent = false,
+  htmlFor,
   theme,
 }: {
   label: string
   children: ReactNode
   accent?: boolean
+  htmlFor?: string
   theme: Theme
 }) {
   return (
     <div>
       <label
+        htmlFor={htmlFor}
         style={{
           display: 'block',
           fontSize: 11,

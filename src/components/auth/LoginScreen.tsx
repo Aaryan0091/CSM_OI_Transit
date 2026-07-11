@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { AUTH_COPY } from '../../data/authCopy'
 import { DEPARTMENTS, THEMES, themedInputStyle } from '../../data/constants'
 import { EyeClosedIcon, EyeIcon } from '../common/Icons'
 import { Field } from '../common/Field'
@@ -35,6 +36,12 @@ export function LoginScreen({
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const theme = THEMES[themeMode]
+  const nameFieldId = 'signup-name'
+  const roleFieldId = 'signup-role'
+  const emailFieldId = `${mode}-email`
+  const passwordFieldId = `${mode}-password`
+  const confirmPasswordFieldId = 'signup-confirm-password'
+  const errorMessageId = `${mode}-auth-error`
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -44,7 +51,7 @@ export function LoginScreen({
     const normalizedEmail = email.trim()
 
     if (!normalizedEmail) {
-      nextError = 'Please enter your work email.'
+      nextError = AUTH_COPY.workEmailMissing
     } else if (!EMAIL_PATTERN.test(normalizedEmail)) {
       nextError = 'Please enter a valid email address.'
     } else if (!password) {
@@ -53,7 +60,7 @@ export function LoginScreen({
       if (name.trim().length < 2) {
         nextError = 'Please enter your name.'
       } else if (password.length < 8) {
-        nextError = 'Password should be at least 8 characters long.'
+        nextError = AUTH_COPY.passwordMinLength
       } else if (password !== confirmPassword) {
         nextError = 'Passwords do not match.'
       } else {
@@ -225,18 +232,21 @@ export function LoginScreen({
         >
           {mode === 'signup' && (
             <>
-              <Field label="Name" theme={theme}>
+              <Field label="Name" htmlFor={nameFieldId} theme={theme}>
                 <input
+                  id={nameFieldId}
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   autoFocus
+                  autoComplete="name"
                   placeholder="Your full name"
                   style={themedInputStyle(theme)}
                 />
               </Field>
               <div style={{ height: 14 }} />
-              <Field label="Role" theme={theme}>
+              <Field label="Role" htmlFor={roleFieldId} theme={theme}>
                 <select
+                  id={roleFieldId}
                   value={dept}
                   onChange={(event) => setDept(event.target.value as Department)}
                   style={themedInputStyle(theme)}
@@ -252,26 +262,32 @@ export function LoginScreen({
             </>
           )}
 
-          <Field label="Email" theme={theme}>
+          <Field label="Email" htmlFor={emailFieldId} theme={theme}>
             <input
+              id={emailFieldId}
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               autoFocus={mode === 'signin'}
               placeholder="name@company.com"
               type="email"
               autoComplete="email"
+              aria-invalid={Boolean(error || externalError)}
+              aria-describedby={error || externalError ? errorMessageId : undefined}
               style={themedInputStyle(theme)}
             />
           </Field>
           <div style={{ height: 14 }} />
-          <Field label="Password" theme={theme}>
+          <Field label="Password" htmlFor={passwordFieldId} theme={theme}>
             <div style={{ position: 'relative' }}>
               <input
+                id={passwordFieldId}
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="........"
                 autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                aria-invalid={Boolean(error || externalError)}
+                aria-describedby={error || externalError ? errorMessageId : undefined}
                 style={{ ...themedInputStyle(theme), paddingRight: 64 }}
               />
               <button
@@ -320,24 +336,32 @@ export function LoginScreen({
           {mode === 'signup' && (
             <>
               <div style={{ height: 14 }} />
-              <Field label="Confirm Password" theme={theme}>
+              <Field label="Confirm Password" htmlFor={confirmPasswordFieldId} theme={theme}>
                 <input
+                  id={confirmPasswordFieldId}
                   type={showPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}
                   placeholder="Repeat password"
                   autoComplete="new-password"
+                  aria-invalid={Boolean(error || externalError)}
+                  aria-describedby={error || externalError ? errorMessageId : undefined}
                   style={themedInputStyle(theme)}
                 />
               </Field>
               <div style={{ marginTop: 8, fontSize: 11, color: theme.textSoft }}>
-                Use at least 8 characters. Admin accounts are created separately by an existing administrator.
+                {AUTH_COPY.manualAdminHelp}
               </div>
             </>
           )}
 
           {(error || externalError) && (
-            <div style={{ color: '#DC2626', fontSize: 12, fontWeight: 600, marginTop: 12 }}>
+            <div
+              id={errorMessageId}
+              role="alert"
+              aria-live="polite"
+              style={{ color: '#DC2626', fontSize: 12, fontWeight: 600, marginTop: 12 }}
+            >
               {error || externalError}
             </div>
           )}
@@ -370,8 +394,8 @@ export function LoginScreen({
 
           <div style={{ marginTop: 18, fontSize: 11, color: theme.textSoft, lineHeight: 1.6 }}>
             {mode === 'signup'
-              ? 'New users can create department accounts here. Admin accounts are assigned separately.'
-              : 'Sign in with your Firebase email/password account. The matching role for this user should exist in Firestore under the `users` collection using the auth UID as the document id.'}
+              ? AUTH_COPY.departmentSignupHelp
+              : AUTH_COPY.profileHelp}
           </div>
         </div>
       </form>

@@ -78,3 +78,17 @@ export type Theme = {
   shadow: string
   hoverShadow: string
 }
+
+export type AdminRequestStatus = 'pending' | 'approved' | 'rejected'
+
+export type AdminRequest = {
+  id: string
+  requesterUid: string
+  requesterEmail: string
+  requesterName: string
+  requesterDept: Department
+  status: AdminRequestStatus
+  createdAt: string
+  approvedAt: string | null
+  approvedBy: string | null
+}
