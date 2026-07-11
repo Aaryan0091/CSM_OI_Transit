@@ -124,6 +124,7 @@ export function AdminAccessGate({
             onChange={(event) => setCode(event.target.value)}
             autoFocus
             placeholder="Enter access code"
+            autoComplete="one-time-code"
             style={themedInputStyle(theme)}
           />
         </Field>

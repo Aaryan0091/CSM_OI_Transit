@@ -2,7 +2,9 @@ import { useState, type FormEvent } from 'react'
 import { DEPARTMENTS, THEMES, themedInputStyle } from '../../data/constants'
 import { EyeClosedIcon, EyeIcon } from '../common/Icons'
 import { Field } from '../common/Field'
-import type { ThemeMode, UserDepartment } from '../../types'
+import type { Department, ThemeMode } from '../../types'
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export function LoginScreen({
   onLogin,
@@ -14,7 +16,7 @@ export function LoginScreen({
   onLogin: (email: string, password: string) => Promise<string | null>
   onSignup: (payload: {
     name: string
-    dept: UserDepartment
+    dept: Department
     email: string
     password: string
   }) => Promise<string | null>
@@ -25,7 +27,7 @@ export function LoginScreen({
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('left')
   const [name, setName] = useState('')
-  const [dept, setDept] = useState<UserDepartment>('Sales')
+  const [dept, setDept] = useState<Department>('Sales')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -39,22 +41,31 @@ export function LoginScreen({
 
     setIsSubmitting(true)
     let nextError: string | null
+    const normalizedEmail = email.trim()
 
-    if (mode === 'signup') {
-      if (!name.trim()) {
+    if (!normalizedEmail) {
+      nextError = 'Please enter your work email.'
+    } else if (!EMAIL_PATTERN.test(normalizedEmail)) {
+      nextError = 'Please enter a valid email address.'
+    } else if (!password) {
+      nextError = 'Please enter your password.'
+    } else if (mode === 'signup') {
+      if (name.trim().length < 2) {
         nextError = 'Please enter your name.'
+      } else if (password.length < 8) {
+        nextError = 'Password should be at least 8 characters long.'
       } else if (password !== confirmPassword) {
         nextError = 'Passwords do not match.'
       } else {
         nextError = await onSignup({
           name: name.trim(),
           dept,
-          email: email.trim(),
+          email: normalizedEmail,
           password,
         })
       }
     } else {
-      nextError = await onLogin(email.trim(), password)
+      nextError = await onLogin(normalizedEmail, password)
     }
 
     setIsSubmitting(false)
@@ -227,10 +238,10 @@ export function LoginScreen({
               <Field label="Role" theme={theme}>
                 <select
                   value={dept}
-                  onChange={(event) => setDept(event.target.value as UserDepartment)}
+                  onChange={(event) => setDept(event.target.value as Department)}
                   style={themedInputStyle(theme)}
                 >
-                  {(['Admin', ...DEPARTMENTS] as const).map((role) => (
+                  {DEPARTMENTS.map((role) => (
                     <option key={role} value={role}>
                       {role}
                     </option>
@@ -247,6 +258,8 @@ export function LoginScreen({
               onChange={(event) => setEmail(event.target.value)}
               autoFocus={mode === 'signin'}
               placeholder="name@company.com"
+              type="email"
+              autoComplete="email"
               style={themedInputStyle(theme)}
             />
           </Field>
@@ -258,6 +271,7 @@ export function LoginScreen({
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="........"
+                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                 style={{ ...themedInputStyle(theme), paddingRight: 64 }}
               />
               <button
@@ -312,9 +326,13 @@ export function LoginScreen({
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}
                   placeholder="Repeat password"
+                  autoComplete="new-password"
                   style={themedInputStyle(theme)}
                 />
               </Field>
+              <div style={{ marginTop: 8, fontSize: 11, color: theme.textSoft }}>
+                Use at least 8 characters. Admin accounts are created separately by an existing administrator.
+              </div>
             </>
           )}
 
@@ -352,7 +370,7 @@ export function LoginScreen({
 
           <div style={{ marginTop: 18, fontSize: 11, color: theme.textSoft, lineHeight: 1.6 }}>
             {mode === 'signup'
-              ? 'New users can create department or admin accounts here.'
+              ? 'New users can create department accounts here. Admin accounts are assigned separately.'
               : 'Sign in with your Firebase email/password account. The matching role for this user should exist in Firestore under the `users` collection using the auth UID as the document id.'}
           </div>
         </div>

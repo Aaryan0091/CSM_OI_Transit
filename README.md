@@ -27,6 +27,7 @@ Required setup:
 2. Enable `Email/Password` sign-in in Firebase Authentication.
 3. Create a Firestore collection named `users`.
 4. For each Firebase Auth user, create a Firestore document whose id matches the auth `uid`.
+5. Create admin users manually in Firebase/Auth + Firestore instead of exposing admin as a public signup role.
 
 Required env vars:
 
@@ -56,6 +57,8 @@ Allowed `dept` values:
 - `Production`
 - `QC`
 - `Dispatch`
+
+Public signup in the app is intentionally limited to department roles. For admin access, create the account yourself and set the corresponding Firestore profile to `dept: "Admin"`.
 
 ## Local Fallback
 
