@@ -17,7 +17,7 @@ export function StatsGrid({
       }}
     >
       {[
-        { label: 'Total Orders', value: stats.total, color: '#1E3A5F' },
+        { label: 'Total Orders', value: stats.total, color: theme.primary },
         { label: 'In Progress', value: stats.inProgress, color: '#3B82F6' },
         { label: 'On Hold', value: stats.onHold, color: '#EF4444' },
         { label: 'Completed', value: stats.completed, color: '#10B981' },

@@ -13,6 +13,7 @@ import {
 import { loadUserProfile } from '../services/users'
 import type { ThemeMode, User, UserDepartment } from '../types'
 import { mapAuthError } from '../utils/auth'
+import { resolveAuthGateState } from '../utils/authFlow'
 import { AUTH_COPY } from '../data/authCopy'
 
 export function useAuthSession() {
@@ -40,17 +41,27 @@ export function useAuthSession() {
     }
 
     const unsubscribe = subscribeToAuthChanges(async (firebaseUser) => {
-      if (!firebaseUser) {
+      const authGateState = resolveAuthGateState(firebaseUser)
+
+      if (authGateState.status === 'signed_out') {
         setCurrentUser(null)
+        setPendingVerificationEmail(null)
         setIsCheckingAuth(false)
         return
       }
 
-      if (!firebaseUser.emailVerified) {
+      if (authGateState.status === 'pending_verification') {
         setCurrentUser(null)
-        setPendingVerificationEmail(firebaseUser.email ?? '')
+        setPendingVerificationEmail(authGateState.email)
         setAuthError(null)
         setAuthMessage(AUTH_COPY.emailVerificationPending)
+        setIsCheckingAuth(false)
+        return
+      }
+
+      if (!firebaseUser) {
+        setCurrentUser(null)
+        setPendingVerificationEmail(null)
         setIsCheckingAuth(false)
         return
       }
@@ -126,6 +137,7 @@ export function useAuthSession() {
   const handleSendVerificationEmail = async () => {
     try {
       setAuthError(null)
+      setAuthMessage(null)
       setIsSendingVerification(true)
       await sendCurrentUserVerificationEmail()
       setAuthMessage(AUTH_COPY.emailVerificationSent)
@@ -140,6 +152,7 @@ export function useAuthSession() {
   const handleRefreshVerification = async () => {
     try {
       setAuthError(null)
+      setAuthMessage(null)
       setIsRefreshingVerification(true)
       const firebaseUser = await reloadCurrentAuthUser()
 

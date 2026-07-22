@@ -1,6 +1,6 @@
 # CSM Engineers Order Tracker
 
-React + TypeScript + Vite app for managing factory orders across departments, with optional Firebase auth/storage and a local sample-data fallback.
+React + TypeScript + Vite app for managing factory orders across departments, with Firebase auth/storage support.
 
 ## Current Architecture
 
@@ -9,7 +9,7 @@ React + TypeScript + Vite app for managing factory orders across departments, wi
 - `src/components/dashboard`: header, filters, stats, banners, and order list UI
 - `src/components/orders`: order editing and creation modals
 - `src/services`: Firebase-facing auth and Firestore access
-- `src/data/constants.ts`: theme tokens, departments, and sample orders
+- `src/data/constants.ts`: theme tokens and departments
 - `src/utils`: pure helpers and normalization logic
 
 ## Firebase Setup
@@ -24,6 +24,7 @@ Firebase is isolated to a small part of the project:
 Required setup:
 
 1. Copy `.env.example` to your local env file and fill in the values.
+   You can also use `.env.local.example` -> `.env.local`.
 2. Enable `Email/Password` sign-in in Firebase Authentication.
 3. Create a Firestore collection named `users`.
 4. For each Firebase Auth user, create a Firestore document whose id matches the auth `uid`.
@@ -93,6 +94,7 @@ The app now supports the first half of the approval flow in the frontend:
 Function setup required before this works end to end:
 
 1. Copy `functions/.env.example` to a real `functions/.env`.
+   You can also start from `functions/.env.local.example`.
 2. Install function dependencies inside `functions/`.
 3. Deploy the functions in `functions/index.mjs`.
 4. Configure these function environment variables:
@@ -105,10 +107,6 @@ Function setup required before this works end to end:
    - `SMTP_USER`
    - `SMTP_PASS`
    - `SMTP_FROM`
-
-## Local Fallback
-
-If Firebase env vars are missing, the app still runs with local sample orders. That makes UI work and layout work easy even before backend setup is complete.
 
 ## Scripts
 

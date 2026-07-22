@@ -103,6 +103,13 @@ export const approveAdminRequest = onRequest(async (request, response) => {
     admin: true,
   })
 
+  await db.collection('users').doc(data.requesterUid).set(
+    {
+      dept: 'Admin',
+    },
+    { merge: true },
+  )
+
   await requestRef.update({
     status: 'approved',
     approvedAt: new Date().toISOString(),

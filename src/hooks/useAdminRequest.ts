@@ -21,8 +21,8 @@ export function useAdminRequest(currentUser: User | null) {
 
       setRequestMessage(
         request.status === 'pending'
-          ? 'Your admin access request has been sent for approval.'
-          : 'Your admin request was created.',
+          ? 'Your admin access request has been sent for approval. After approval, sign out and sign back in.'
+          : 'Your admin request was created. After approval, sign out and sign back in.',
       )
     } catch (error) {
       setRequestError(

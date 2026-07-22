@@ -1,7 +1,6 @@
 import type { CSSProperties } from 'react'
 import type {
   Department,
-  Order,
   PriorityMeta,
   StatusMeta,
   Theme,
@@ -23,85 +22,6 @@ export const STATUS_META: StatusMeta = {
   Completed: { color: '#10B981', bg: '#D1FAE5', dot: '#10B981' },
   Dispatched: { color: '#8B5CF6', bg: '#EDE9FE', dot: '#8B5CF6' },
 }
-
-export const INITIAL_ORDERS: Order[] = [
-  {
-    id: 'ORD-001',
-    company: 'CSM',
-    client: 'Indian Railways - NR Zone',
-    product: 'FRP Equipment Enclosures',
-    description: 'x 120',
-    deadline: '2026-07-15',
-    priority: 'High',
-    overallStatus: 'In Progress',
-    tasks: [
-      { dept: 'Sales', status: 'Completed', assignee: 'Ravi Sharma', remark: 'PO received & reviewed', nextDeptRemark: 'PO is verified. Client requirements are ready for design handoff.', nextDeptRemarkTarget: 'Design', holdReason: '' },
-      { dept: 'Design', status: 'Completed', assignee: 'Priya Nair', remark: 'Drawings approved by client', nextDeptRemark: 'Approved drawings shared for material planning.', nextDeptRemarkTarget: 'Procurement', holdReason: '' },
-      { dept: 'Procurement', status: 'In Progress', assignee: 'Anil Gupta', remark: 'Resin & mat ordered, ETA 3 Jul', nextDeptRemark: '', nextDeptRemarkTarget: '', holdReason: '' },
-      { dept: 'Production', status: 'In Progress', assignee: 'Suresh Kumar', remark: 'Awaiting raw material', nextDeptRemark: '', nextDeptRemarkTarget: '', holdReason: '' },
-      { dept: 'QC', status: 'In Progress', assignee: 'Deepak Verma', remark: '', nextDeptRemark: '', nextDeptRemarkTarget: '', holdReason: '' },
-      { dept: 'Dispatch', status: 'In Progress', assignee: '', remark: '', nextDeptRemark: '', nextDeptRemarkTarget: '', holdReason: '' },
-    ],
-    createdAt: '2026-06-01',
-  },
-  {
-    id: 'ORD-002',
-    company: 'CSM',
-    client: 'DRDO - Pune Lab',
-    product: 'Defence-grade GRP Panels',
-    description: 'x 40',
-    deadline: '2026-07-10',
-    priority: 'Critical',
-    overallStatus: 'On Hold',
-    tasks: [
-      { dept: 'Sales', status: 'Completed', assignee: 'Ravi Sharma', remark: 'Signed NDA & PO', nextDeptRemark: 'Customer documents cleared, proceed with technical review.', nextDeptRemarkTarget: 'Design', holdReason: '' },
-      { dept: 'Design', status: 'On Hold', assignee: 'Priya Nair', remark: 'Awaiting spec clarification from DRDO', nextDeptRemark: '', nextDeptRemarkTarget: '', holdReason: 'Client has not responded to spec query sent on 20 Jun' },
-      { dept: 'Procurement', status: 'In Progress', assignee: 'Anil Gupta', remark: '', nextDeptRemark: '', nextDeptRemarkTarget: '', holdReason: '' },
-      { dept: 'Production', status: 'In Progress', assignee: '', remark: '', nextDeptRemark: '', nextDeptRemarkTarget: '', holdReason: '' },
-      { dept: 'QC', status: 'In Progress', assignee: '', remark: '', nextDeptRemark: '', nextDeptRemarkTarget: '', holdReason: '' },
-      { dept: 'Dispatch', status: 'In Progress', assignee: '', remark: '', nextDeptRemark: '', nextDeptRemarkTarget: '', holdReason: '' },
-    ],
-    createdAt: '2026-06-10',
-  },
-  {
-    id: 'ORD-003',
-    company: 'Oriental',
-    client: 'NTPC - Faridabad Plant',
-    product: 'FRP Cable Trays',
-    description: 'x 500 mtrs',
-    deadline: '2026-08-01',
-    priority: 'Medium',
-    overallStatus: 'In Progress',
-    tasks: [
-      { dept: 'Sales', status: 'Completed', assignee: 'Ravi Sharma', remark: 'PO confirmed', nextDeptRemark: 'Commercial clearance done. Standard tray specs confirmed.', nextDeptRemarkTarget: 'Design', holdReason: '' },
-      { dept: 'Design', status: 'Completed', assignee: 'Meena Joshi', remark: 'Standard drawings used', nextDeptRemark: 'Use revision D-14 drawings for all fabrication.', nextDeptRemarkTarget: 'Production', holdReason: '' },
-      { dept: 'Procurement', status: 'Completed', assignee: 'Anil Gupta', remark: 'Material in stock', nextDeptRemark: 'All raw materials issued and available at shop floor.', nextDeptRemarkTarget: 'Production', holdReason: '' },
-      { dept: 'Production', status: 'In Progress', assignee: 'Suresh Kumar', remark: '150 mtrs moulded, running on schedule', nextDeptRemark: '', nextDeptRemarkTarget: '', holdReason: '' },
-      { dept: 'QC', status: 'In Progress', assignee: 'Deepak Verma', remark: '', nextDeptRemark: '', nextDeptRemarkTarget: '', holdReason: '' },
-      { dept: 'Dispatch', status: 'In Progress', assignee: '', remark: '', nextDeptRemark: '', nextDeptRemarkTarget: '', holdReason: '' },
-    ],
-    createdAt: '2026-06-15',
-  },
-  {
-    id: 'ORD-004',
-    company: 'Oriental',
-    client: 'BHEL - Haridwar',
-    product: 'Epoxy Insulator Sets',
-    description: 'x 80',
-    deadline: '2026-07-25',
-    priority: 'High',
-    overallStatus: 'In Progress',
-    tasks: [
-      { dept: 'Sales', status: 'Completed', assignee: 'Ravi Sharma', remark: 'PO + advance received', nextDeptRemark: 'Advance cleared. Priority handling requested by client.', nextDeptRemarkTarget: 'Design', holdReason: '' },
-      { dept: 'Design', status: 'Completed', assignee: 'Priya Nair', remark: 'Drawings finalised', nextDeptRemark: 'Final GA and dimensions locked for procurement.', nextDeptRemarkTarget: 'Procurement', holdReason: '' },
-      { dept: 'Procurement', status: 'On Hold', assignee: 'Anil Gupta', remark: 'Epoxy resin vendor delay', nextDeptRemark: '', nextDeptRemarkTarget: '', holdReason: 'Vendor Chem-India citing 10-day delivery delay due to freight backlog' },
-      { dept: 'Production', status: 'In Progress', assignee: 'Suresh Kumar', remark: '', nextDeptRemark: '', nextDeptRemarkTarget: '', holdReason: '' },
-      { dept: 'QC', status: 'In Progress', assignee: 'Deepak Verma', remark: '', nextDeptRemark: '', nextDeptRemarkTarget: '', holdReason: '' },
-      { dept: 'Dispatch', status: 'In Progress', assignee: '', remark: '', nextDeptRemark: '', nextDeptRemarkTarget: '', holdReason: '' },
-    ],
-    createdAt: '2026-06-20',
-  },
-]
 
 export const PRIORITY_META: PriorityMeta = {
   Critical: { color: '#991B1B', bg: '#FEE2E2' },

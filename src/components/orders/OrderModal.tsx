@@ -9,6 +9,7 @@ import { Field } from '../common/Field'
 import { StatusDot } from '../common/OrderVisuals'
 import type { Department, Order, Status, Task, Theme, User } from '../../types'
 import { normalizeTask } from '../../utils/orders'
+import { validateOrderTasks } from '../../utils/orderActions'
 
 export function OrderModal({
   order,
@@ -34,8 +35,10 @@ export function OrderModal({
   const [deadline, setDeadline] = useState(order.deadline)
   const [isChangingDeadline, setIsChangingDeadline] = useState(false)
   const [activeTab, setActiveTab] = useState(initialActiveTab)
+  const [saveError, setSaveError] = useState('')
 
   const update = <K extends keyof Task>(index: number, field: K, value: Task[K]) => {
+    setSaveError('')
     setTasks((previous) => {
       const next = [...previous]
       next[index] = { ...next[index], [field]: value }
@@ -152,6 +155,21 @@ export function OrderModal({
 
         <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {saveError && (
+              <div
+                role="alert"
+                style={{
+                  background: '#FEE2E2',
+                  borderRadius: 8,
+                  padding: '10px 12px',
+                  fontSize: 12,
+                  color: '#B91C1C',
+                  fontWeight: 700,
+                }}
+              >
+                {saveError}
+              </div>
+            )}
             {!editable && (
               <div
                 style={{
@@ -377,7 +395,22 @@ export function OrderModal({
               Cancel
             </button>
             <button
-              onClick={() => onSave(order.id, { tasks, deadline })}
+              onClick={() => {
+                const taskValidationError = validateOrderTasks(tasks)
+
+                if (taskValidationError) {
+                  setSaveError(taskValidationError)
+                  return
+                }
+
+                if (currentUser.dept === 'Admin' && !deadline.trim()) {
+                  setSaveError('Please choose a deadline before saving this order.')
+                  return
+                }
+
+                setSaveError('')
+                onSave(order.id, { tasks, deadline })
+              }}
               style={{
                 padding: '10px 24px',
                 borderRadius: 8,

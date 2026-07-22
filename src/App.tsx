@@ -122,7 +122,7 @@ export default function App() {
 
       {!isLoadingOrders && !isFirebaseConfigured && (
         <StatusBanner
-          message="Firestore is not configured yet. The app is using local sample data."
+          message="Firestore is not configured yet. Connect Firebase to load and save real orders."
           tone="warning"
           theme={theme}
         />

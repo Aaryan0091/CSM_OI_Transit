@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
-import { INITIAL_ORDERS } from '../data/constants'
 import { isFirebaseConfigured } from '../lib/firebase'
 import { loadOrdersFromFirestore, saveOrderToFirestore } from '../services/orders'
 import type { Company, Department, Order, Task, User } from '../types'
-import { deriveStatus } from '../utils/orders'
+import { applyOrderUpdates, canCreateOrders } from '../utils/orderActions'
 
 export function useOrdersData(currentUser: User | null) {
-  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS)
+  const [orders, setOrders] = useState<Order[]>([])
   const [selected, setSelected] = useState<Order | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [filter, setFilter] = useState<'All' | Order['overallStatus']>('All')
@@ -36,8 +35,8 @@ export function useOrdersData(currentUser: User | null) {
         console.error('Failed to load Firestore orders:', error)
 
         if (!cancelled) {
-          setOrders(INITIAL_ORDERS)
-          setSyncError('Could not load Firestore data. Showing local sample orders instead.')
+          setOrders([])
+          setSyncError('Could not load Firestore orders. Check your Firebase rules and connection.')
         }
       } finally {
         if (!cancelled) {
@@ -58,39 +57,29 @@ export function useOrdersData(currentUser: User | null) {
     updates: { tasks: Task[]; deadline: string },
   ) => {
     if (!currentUser) {
+      setSyncError('Please sign in again before saving order changes.')
       return
     }
 
     let updatedOrder: Order | null = null
 
-    setOrders((previous) =>
-      previous.map((order) => {
-        if (order.id !== id) {
-          return order
-        }
+    try {
+      setOrders((previous) =>
+        previous.map((order) => {
+          if (order.id !== id) {
+            return order
+          }
 
-        const mergedTasks =
-          currentUser.dept === 'Admin'
-            ? updates.tasks
-            : order.tasks.map((task) => {
-                const nextTask = updates.tasks.find((candidate) => candidate.dept === task.dept)
+          updatedOrder = applyOrderUpdates(order, updates, currentUser)
+          return updatedOrder
+        }),
+      )
+      setSyncError(null)
+    } catch (error) {
+      setSyncError(error instanceof Error ? error.message : 'Unable to save this order right now.')
+      return
+    }
 
-                if (!nextTask || task.dept !== currentUser.dept) {
-                  return task
-                }
-
-                return nextTask
-              })
-
-        updatedOrder = {
-          ...order,
-          tasks: mergedTasks,
-          deadline: currentUser.dept === 'Admin' ? updates.deadline : order.deadline,
-          overallStatus: deriveStatus(mergedTasks),
-        }
-        return updatedOrder
-      }),
-    )
     setSelected(null)
 
     if (!updatedOrder || !isFirebaseConfigured) {
@@ -102,15 +91,22 @@ export function useOrdersData(currentUser: User | null) {
       setSyncError(null)
     } catch (error) {
       console.error('Failed to save Firestore order:', error)
-      setSyncError('Order changes were saved locally, but Firestore sync failed.')
+      setSyncError('Order changes could not be saved to Firestore.')
     }
   }
 
   const handleAdd = async (order: Order) => {
+    if (!canCreateOrders(currentUser)) {
+      setSyncError('Only admins can create new orders.')
+      return
+    }
+
     setOrders((previous) => [order, ...previous])
     setAddOpen(false)
+    setSyncError(null)
 
     if (!isFirebaseConfigured) {
+      setSyncError('Firebase is not configured, so new orders cannot be saved yet.')
       return
     }
 
@@ -119,7 +115,8 @@ export function useOrdersData(currentUser: User | null) {
       setSyncError(null)
     } catch (error) {
       console.error('Failed to create Firestore order:', error)
-      setSyncError('The new order was added locally, but Firestore sync failed.')
+      setOrders((previous) => previous.filter((existing) => existing.id !== order.id))
+      setSyncError('The new order could not be created in Firestore.')
     }
   }
 

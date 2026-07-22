@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { DEPARTMENTS, themedInputStyle } from '../../data/constants'
+import { themedInputStyle } from '../../data/constants'
 import { Field } from '../common/Field'
 import type { Company, Order, Priority, Theme } from '../../types'
+import { buildNewOrder } from '../../utils/orderActions'
 
 export function AddOrderModal({
   onClose,
@@ -27,33 +28,22 @@ export function AddOrderModal({
     deadline: '',
     priority: 'Medium',
   })
+  const [formError, setFormError] = useState('')
 
   const updateField = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => {
+    setFormError('')
     setForm((previous) => ({ ...previous, [key]: value }))
   }
 
   const handleAdd = () => {
-    if (!form.client || !form.product || !form.deadline) {
+    const nextOrder = buildNewOrder(form)
+
+    if (!nextOrder.order || nextOrder.error) {
+      setFormError(nextOrder.error ?? 'Unable to create this order right now.')
       return
     }
 
-    const newOrder: Order = {
-      id: `ORD-${String(Math.floor(Math.random() * 900) + 100)}`,
-      ...form,
-      overallStatus: 'In Progress',
-      tasks: DEPARTMENTS.map((dept) => ({
-        dept,
-        status: 'In Progress',
-        assignee: '',
-        remark: '',
-        nextDeptRemark: '',
-        nextDeptRemarkTarget: '',
-        holdReason: '',
-      })),
-      createdAt: new Date().toISOString().split('T')[0],
-    }
-
-    onAdd(newOrder)
+    onAdd(nextOrder.order as Order)
   }
 
   return (
@@ -88,6 +78,21 @@ export function AddOrderModal({
           </div>
         </div>
         <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {formError && (
+            <div
+              role="alert"
+              style={{
+                borderRadius: 10,
+                background: '#FEE2E2',
+                color: '#B91C1C',
+                padding: '10px 12px',
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              {formError}
+            </div>
+          )}
           <Field label="Company" theme={theme}>
             <select
               value={form.company}
@@ -103,7 +108,7 @@ export function AddOrderModal({
             <input
               value={form.client}
               onChange={(event) => updateField('client', event.target.value)}
-              placeholder="e.g. Indian Railways - NR Zone"
+              placeholder="Enter client or organisation name"
               style={themedInputStyle(theme)}
             />
           </Field>
