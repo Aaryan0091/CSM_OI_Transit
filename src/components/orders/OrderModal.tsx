@@ -21,7 +21,7 @@ export function OrderModal({
 }: {
   order: Order
   onClose: () => void
-  onSave: (id: string, updates: { tasks: Task[]; deadline: string }) => void
+  onSave: (id: string, updates: { tasks: Task[]; deadline: string }) => Promise<string | null>
   currentUser: User
   theme: Theme
 }) {
@@ -42,6 +42,7 @@ export function OrderModal({
   const [isChangingDeadline, setIsChangingDeadline] = useState(false)
   const [activeTab, setActiveTab] = useState(initialActiveTab)
   const [saveError, setSaveError] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
 
   const update = <K extends keyof Task>(index: number, field: K, value: Task[K]) => {
     setSaveError('')
@@ -430,7 +431,7 @@ export function OrderModal({
               Cancel
             </button>
             <button
-              onClick={() => {
+              onClick={async () => {
                 const taskValidationError = validateOrderTasks(tasks)
 
                 if (taskValidationError) {
@@ -444,19 +445,31 @@ export function OrderModal({
                 }
 
                 setSaveError('')
-                onSave(order.id, { tasks, deadline })
+                setIsSaving(true)
+
+                try {
+                  const errorMessage = await onSave(order.id, { tasks, deadline })
+
+                  if (errorMessage) {
+                    setSaveError(errorMessage)
+                  }
+                } finally {
+                  setIsSaving(false)
+                }
               }}
+              disabled={isSaving}
               style={{
                 padding: '10px 24px',
                 borderRadius: 8,
                 border: 'none',
                 background: theme.primary,
                 color: theme.primaryText,
-                cursor: 'pointer',
+                cursor: isSaving ? 'wait' : 'pointer',
                 fontWeight: 700,
+                opacity: isSaving ? 0.75 : 1,
               }}
             >
-              Save Changes
+              {isSaving ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </div>

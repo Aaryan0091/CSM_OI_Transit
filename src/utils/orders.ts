@@ -32,10 +32,17 @@ export function pipelineProgressPct(tasks: Task[]) {
 }
 
 export function normalizeTask(
-  task: Task | (Omit<Task, 'nextDeptRemark' | 'nextDeptRemarkTarget'> & { nextDeptRemark?: string; nextDeptRemarkTarget?: Department | '' }),
+  task: Task | (
+    Omit<Task, 'holdReason' | 'nextDeptRemark' | 'nextDeptRemarkTarget'> & {
+      holdReason?: string
+      nextDeptRemark?: string
+      nextDeptRemarkTarget?: Department | ''
+    }
+  ),
 ): Task {
   return {
     ...task,
+    holdReason: task.holdReason ?? '',
     nextDeptRemark: task.nextDeptRemark ?? '',
     nextDeptRemarkTarget: task.nextDeptRemarkTarget ?? '',
   }

@@ -52,17 +52,19 @@ export function useOrdersData(currentUser: User | null) {
   const handleSave = async (
     id: string,
     updates: { tasks: Task[]; deadline: string },
-  ) => {
+  ): Promise<string | null> => {
     if (!currentUser) {
-      setSyncError('Please sign in again before saving order changes.')
-      return
+      const message = 'Please sign in again before saving order changes.'
+      setSyncError(message)
+      return message
     }
 
     const originalOrder = orders.find((order) => order.id === id)
 
     if (!originalOrder) {
-      setSyncError('This order is no longer available. Please refresh and try again.')
-      return
+      const message = 'This order is no longer available. Please refresh and try again.'
+      setSyncError(message)
+      return message
     }
 
     let updatedOrder: Order
@@ -74,22 +76,42 @@ export function useOrdersData(currentUser: User | null) {
       )
       setSyncError(null)
     } catch (error) {
-      setSyncError(error instanceof Error ? error.message : 'Unable to save this order right now.')
-      return
+      const message = error instanceof Error ? error.message : 'Unable to save this order right now.'
+      setSyncError(message)
+      return message
     }
 
-    setSelected(null)
-
     if (!isFirebaseConfigured) {
-      return
+      const message = 'Firebase is not configured, so order changes cannot be saved.'
+      setOrders((previous) =>
+        previous.map((order) => (order.id === id ? originalOrder : order)),
+      )
+      setSyncError(message)
+      return message
     }
 
     try {
       await saveOrderToFirestore(updatedOrder, currentUser, originalOrder)
       setSyncError(null)
+      setSelected(null)
+      return null
     } catch (error) {
       console.error('Failed to save Firestore order:', error)
-      setSyncError('Order changes could not be saved to Firestore.')
+      const errorCode =
+        typeof error === 'object' && error !== null && 'code' in error
+          ? String(error.code)
+          : ''
+      const message = errorCode.includes('permission-denied')
+        ? 'Firestore denied this update. Deploy the latest rules, confirm App Check, then sign in again.'
+        : errorCode.includes('unavailable') || errorCode.includes('network')
+          ? 'Firestore is temporarily unavailable. Check your connection and try again.'
+          : 'Order changes could not be saved to Firestore. Please try again.'
+
+      setOrders((previous) =>
+        previous.map((order) => (order.id === id ? originalOrder : order)),
+      )
+      setSyncError(message)
+      return message
     }
   }
 

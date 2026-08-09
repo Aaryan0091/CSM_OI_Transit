@@ -28,7 +28,9 @@ export function OrderCard({
         padding: '18px 22px',
         boxShadow: theme.shadow,
         cursor: 'pointer',
-        border: `1.5px solid ${theme.border}`,
+        borderTop: `1.5px solid ${theme.border}`,
+        borderRight: `1.5px solid ${theme.border}`,
+        borderBottom: `1.5px solid ${theme.border}`,
         transition: 'border-color 0.15s, box-shadow 0.15s',
         borderLeft: `4px solid ${statusMeta.dot}`,
       }}

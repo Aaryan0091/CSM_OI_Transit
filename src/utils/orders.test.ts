@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Status, Task } from '../types'
-import { pipelineProgressPct } from './orders'
+import { normalizeTask, pipelineProgressPct } from './orders'
 
 const departments = ['Sales', 'Design', 'Procurement', 'Production', 'QC', 'Dispatch'] as const
 
@@ -60,5 +60,20 @@ describe('pipelineProgressPct', () => {
         ]),
       ),
     ).toBe(100)
+  })
+})
+
+describe('normalizeTask', () => {
+  it('adds fields required by current rules to legacy tasks', () => {
+    const normalized = normalizeTask({
+      dept: 'Sales',
+      status: 'In Progress',
+      assignee: '',
+      remark: '',
+    })
+
+    expect(normalized.holdReason).toBe('')
+    expect(normalized.nextDeptRemark).toBe('')
+    expect(normalized.nextDeptRemarkTarget).toBe('')
   })
 })
