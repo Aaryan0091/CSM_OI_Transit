@@ -13,6 +13,24 @@ export function progressPct(tasks: Task[]) {
   return Math.round((done / tasks.length) * 100)
 }
 
+export function pipelineProgressPct(tasks: Task[]) {
+  if (tasks.length <= 1) {
+    return tasks[0]?.status === 'Completed' || tasks[0]?.status === 'Dispatched' ? 100 : 0
+  }
+
+  const activeIndex = tasks.findIndex(
+    (task) => task.status === 'In Progress' || task.status === 'On Hold',
+  )
+  const lastCompletedIndex = tasks.reduce(
+    (lastIndex, task, index) =>
+      task.status === 'Completed' || task.status === 'Dispatched' ? index : lastIndex,
+    -1,
+  )
+  const workflowIndex = activeIndex >= 0 ? activeIndex : Math.max(lastCompletedIndex, 0)
+
+  return Math.min(100, Math.max(0, (workflowIndex / (tasks.length - 1)) * 100))
+}
+
 export function normalizeTask(
   task: Task | (Omit<Task, 'nextDeptRemark' | 'nextDeptRemarkTarget'> & { nextDeptRemark?: string; nextDeptRemarkTarget?: Department | '' }),
 ): Task {

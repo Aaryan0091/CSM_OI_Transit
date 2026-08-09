@@ -1,5 +1,6 @@
 import { STATUS_META } from '../../data/constants'
 import type { Status, Task, Theme } from '../../types'
+import { pipelineProgressPct } from '../../utils/orders'
 
 export function Badge({ label, meta }: { label: string; meta: { bg: string; color: string } }) {
   return (
@@ -39,8 +40,7 @@ export function StatusDot({ status }: { status: Status }) {
 
 export function DeptPipeline({ tasks, theme }: { tasks: Task[]; theme: Theme }) {
   const activeIndex = tasks.findIndex((task) => task.status === 'In Progress' || task.status === 'On Hold')
-  const completedCount = tasks.filter((task) => task.status === 'Completed' || task.status === 'Dispatched').length
-  const progressPercent = tasks.length > 1 ? (completedCount / (tasks.length - 1)) * 100 : 0
+  const progressPercent = pipelineProgressPct(tasks)
 
   return (
     <div style={{ position: 'relative', padding: '16px 8px 10px 8px', marginTop: 10 }}>
@@ -64,7 +64,7 @@ export function DeptPipeline({ tasks, theme }: { tasks: Task[]; theme: Theme }) 
           top: 24,
           height: 4,
           background: '#10B981',
-          width: `calc(${progressPercent}% - 4px)`,
+          width: `calc((100% - 40px) * ${progressPercent / 100})`,
           borderRadius: 2,
           zIndex: 1,
           transition: 'width 0.4s ease-out',
