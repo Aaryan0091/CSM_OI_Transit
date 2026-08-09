@@ -10,7 +10,7 @@ import { StatusDot } from '../common/OrderVisuals'
 import { OrderActivityTimeline } from './OrderActivityTimeline'
 import type { Department, Order, Status, Task, Theme, User } from '../../types'
 import { normalizeTask } from '../../utils/orders'
-import { validateOrderTasks } from '../../utils/orderActions'
+import { updateTaskStatusAndAdvance, validateOrderTasks } from '../../utils/orderActions'
 
 export function OrderModal({
   order,
@@ -26,9 +26,14 @@ export function OrderModal({
   theme: Theme
 }) {
   const normalizedTasks = order.tasks.map(normalizeTask)
+  const currentTaskIndex = normalizedTasks.findIndex(
+    (task) => task.status === 'In Progress' || task.status === 'On Hold',
+  )
   const editableTaskIndex =
     currentUser.dept === 'Admin'
-      ? 0
+      ? currentTaskIndex >= 0
+        ? currentTaskIndex
+        : normalizedTasks.length - 1
       : normalizedTasks.findIndex((task) => task.dept === currentUser.dept)
   const initialActiveTab = editableTaskIndex >= 0 ? editableTaskIndex : 0
 
@@ -44,6 +49,19 @@ export function OrderModal({
       const next = [...previous]
       next[index] = { ...next[index], [field]: value }
       return next
+    })
+  }
+
+  const updateStatus = (index: number, status: Status) => {
+    setSaveError('')
+    setTasks((previous) => {
+      const result = updateTaskStatusAndAdvance(previous, index, status)
+
+      if (currentUser.dept === 'Admin' && result.nextTaskIndex !== index) {
+        setActiveTab(result.nextTaskIndex)
+      }
+
+      return result.tasks
     })
   }
 
@@ -289,13 +307,19 @@ export function OrderModal({
               <Field label="Status" theme={theme}>
                 <select
                   value={activeTask.status}
-                  onChange={(event) => update(activeTab, 'status', event.target.value as Status)}
+                  onChange={(event) => updateStatus(activeTab, event.target.value as Status)}
                   disabled={!editable}
                   style={{ ...themedInputStyle(theme), ...(editable ? {} : themedDisabledStyle(theme)) }}
                 >
-                  {Object.keys(STATUS_META).map((status) => (
+                  {Object.keys(STATUS_META)
+                    .filter((status) =>
+                      activeTask.dept === 'Dispatch'
+                        ? status !== 'Completed'
+                        : status !== 'Dispatched',
+                    )
+                    .map((status) => (
                     <option key={status}>{status}</option>
-                  ))}
+                    ))}
                 </select>
               </Field>
             </div>
@@ -356,7 +380,15 @@ export function OrderModal({
                   style={{
                     ...themedInputStyle(theme),
                     borderColor: '#FCA5A5',
-                    background: editable ? '#FFF5F5' : theme.surfaceAlt,
+                    background: editable
+                      ? theme.inputBg === '#0B1220'
+                        ? '#2B151B'
+                        : '#FFF5F5'
+                      : theme.surfaceAlt,
+                    color:
+                      editable && theme.inputBg === '#0B1220'
+                        ? '#a8f5e9'
+                        : theme.inputText,
                     resize: 'vertical',
                     ...(editable ? {} : { color: theme.textSoft, cursor: 'not-allowed' }),
                   }}

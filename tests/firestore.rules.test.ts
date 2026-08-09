@@ -183,6 +183,64 @@ describe('Firestore security rules', () => {
     )
   })
 
+  test('allows a completed department to activate only the next task', async () => {
+    await seedOrderAndProfiles()
+    const database = authenticatedDatabase(SALES_USER_ID)
+    const order = buildOrder()
+    order.tasks = order.tasks.map((task, index) => ({
+      ...task,
+      status: index === 0 ? 'In Progress' : 'Pending',
+    }))
+
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'orders', ORDER_ID), order)
+    })
+
+    const advancedTasks = updateTask(
+      updateTask(order.tasks, 0, { status: 'Completed' }),
+      1,
+      { status: 'In Progress' },
+    )
+
+    await assertSucceeds(
+      commitOrderUpdate(
+        database,
+        { tasks: advancedTasks },
+        'sales-completed',
+        { uid: SALES_USER_ID, name: 'Sales User', dept: 'Sales' },
+      ),
+    )
+  })
+
+  test('blocks a department from editing details while activating the next task', async () => {
+    await seedOrderAndProfiles()
+    const database = authenticatedDatabase(SALES_USER_ID)
+    const order = buildOrder()
+    order.tasks = order.tasks.map((task, index) => ({
+      ...task,
+      status: index === 0 ? 'In Progress' : 'Pending',
+    }))
+
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'orders', ORDER_ID), order)
+    })
+
+    const tamperedTasks = updateTask(
+      updateTask(order.tasks, 0, { status: 'Completed' }),
+      1,
+      { status: 'In Progress', remark: 'Unauthorized design change' },
+    )
+
+    await assertFails(
+      commitOrderUpdate(
+        database,
+        { tasks: tamperedTasks },
+        'sales-tampered-next',
+        { uid: SALES_USER_ID, name: 'Sales User', dept: 'Sales' },
+      ),
+    )
+  })
+
   test('blocks a department user from updating another department task', async () => {
     await seedOrderAndProfiles()
     const database = authenticatedDatabase(SALES_USER_ID)

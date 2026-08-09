@@ -4,6 +4,7 @@ import {
   applyOrderUpdates,
   buildNewOrder,
   canCreateOrders,
+  updateTaskStatusAndAdvance,
   validateOrderTasks,
 } from './orderActions'
 
@@ -86,6 +87,37 @@ describe('orderActions', () => {
     expect(result.order?.client).toBe('Test Client')
     expect(result.order?.product).toBe('FRP Cable Tray')
     expect(result.order?.tasks).toHaveLength(6)
+    expect(result.order?.tasks.map((task) => task.status)).toEqual([
+      'In Progress',
+      'Pending',
+      'Pending',
+      'Pending',
+      'Pending',
+      'Pending',
+    ])
+  })
+
+  it('activates the next department when the current department finishes', () => {
+    const order = buildNewOrder(
+      {
+        company: 'CSM',
+        client: 'Test Client',
+        product: 'Test Product',
+        description: '',
+        deadline: '2026-08-30',
+        priority: 'Medium',
+      },
+      { id: 'ORD-200' },
+    ).order
+
+    expect(order).not.toBeNull()
+
+    const result = updateTaskStatusAndAdvance(order!.tasks, 0, 'Completed')
+
+    expect(result.tasks[0].status).toBe('Completed')
+    expect(result.tasks[1].status).toBe('In Progress')
+    expect(result.tasks[2].status).toBe('Pending')
+    expect(result.nextTaskIndex).toBe(1)
   })
 
   it('requires a hold reason when a task is on hold', () => {

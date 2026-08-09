@@ -17,6 +17,7 @@ export const DEPARTMENTS: Department[] = [
 ]
 
 export const STATUS_META: StatusMeta = {
+  Pending: { color: '#64748B', bg: '#E2E8F0', dot: '#94A3B8' },
   'In Progress': { color: '#3B82F6', bg: '#DBEAFE', dot: '#3B82F6' },
   'On Hold': { color: '#EF4444', bg: '#FEE2E2', dot: '#EF4444' },
   Completed: { color: '#10B981', bg: '#D1FAE5', dot: '#10B981' },

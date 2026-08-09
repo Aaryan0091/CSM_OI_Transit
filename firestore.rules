@@ -70,7 +70,7 @@ service cloud.firestore {
           'holdReason'
         ]) &&
         task.dept == expectedDepartment &&
-        task.status in ['In Progress', 'On Hold', 'Completed', 'Dispatched'] &&
+        task.status in ['Pending', 'In Progress', 'On Hold', 'Completed', 'Dispatched'] &&
         task.assignee is string &&
         task.assignee.size() <= 200 &&
         task.remark is string &&
@@ -170,15 +170,60 @@ service cloud.firestore {
         department == 'Dispatch' ? 5 : -1;
     }
 
-    function onlyDepartmentTaskChanged(before, after, department) {
+    function onlyDepartmentAndNextTaskChanged(before, after, department) {
       let editableIndex = departmentIndex(department);
       return isDepartment(department) &&
-        (editableIndex == 0 || before.tasks[0] == after.tasks[0]) &&
-        (editableIndex == 1 || before.tasks[1] == after.tasks[1]) &&
-        (editableIndex == 2 || before.tasks[2] == after.tasks[2]) &&
-        (editableIndex == 3 || before.tasks[3] == after.tasks[3]) &&
-        (editableIndex == 4 || before.tasks[4] == after.tasks[4]) &&
-        (editableIndex == 5 || before.tasks[5] == after.tasks[5]);
+        (editableIndex == 0 || editableIndex + 1 == 0 || before.tasks[0] == after.tasks[0]) &&
+        (editableIndex == 1 || editableIndex + 1 == 1 || before.tasks[1] == after.tasks[1]) &&
+        (editableIndex == 2 || editableIndex + 1 == 2 || before.tasks[2] == after.tasks[2]) &&
+        (editableIndex == 3 || editableIndex + 1 == 3 || before.tasks[3] == after.tasks[3]) &&
+        (editableIndex == 4 || editableIndex + 1 == 4 || before.tasks[4] == after.tasks[4]) &&
+        (editableIndex == 5 || editableIndex + 1 == 5 || before.tasks[5] == after.tasks[5]);
+    }
+
+    function taskOnlyActivated(beforeTask, afterTask) {
+      return beforeTask.status == 'Pending' &&
+        afterTask.status == 'In Progress' &&
+        beforeTask.diff(afterTask).affectedKeys().hasOnly(['status']);
+    }
+
+    function nextTaskUnchangedOrActivated(before, after, department) {
+      return department == 'Dispatch' ||
+        (department == 'Sales' && (
+          before.tasks[1] == after.tasks[1] ||
+          (
+            after.tasks[0].status in ['Completed', 'Dispatched'] &&
+            taskOnlyActivated(before.tasks[1], after.tasks[1])
+          )
+        )) ||
+        (department == 'Design' && (
+          before.tasks[2] == after.tasks[2] ||
+          (
+            after.tasks[1].status in ['Completed', 'Dispatched'] &&
+            taskOnlyActivated(before.tasks[2], after.tasks[2])
+          )
+        )) ||
+        (department == 'Procurement' && (
+          before.tasks[3] == after.tasks[3] ||
+          (
+            after.tasks[2].status in ['Completed', 'Dispatched'] &&
+            taskOnlyActivated(before.tasks[3], after.tasks[3])
+          )
+        )) ||
+        (department == 'Production' && (
+          before.tasks[4] == after.tasks[4] ||
+          (
+            after.tasks[3].status in ['Completed', 'Dispatched'] &&
+            taskOnlyActivated(before.tasks[4], after.tasks[4])
+          )
+        )) ||
+        (department == 'QC' && (
+          before.tasks[5] == after.tasks[5] ||
+          (
+            after.tasks[4].status in ['Completed', 'Dispatched'] &&
+            taskOnlyActivated(before.tasks[5], after.tasks[5])
+          )
+        ));
     }
 
     function isValidDepartmentUpdate(data, department) {
@@ -237,7 +282,12 @@ service cloud.firestore {
             'overallStatus',
             'lastActivityId'
           ]) &&
-          onlyDepartmentTaskChanged(
+          onlyDepartmentAndNextTaskChanged(
+            resource.data,
+            request.resource.data,
+            currentUserDepartment()
+          ) &&
+          nextTaskUnchangedOrActivated(
             resource.data,
             request.resource.data,
             currentUserDepartment()

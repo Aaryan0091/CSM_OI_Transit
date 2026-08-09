@@ -60,9 +60,9 @@ export function buildNewOrder(
       deadline: form.deadline,
       priority: form.priority,
       overallStatus: 'In Progress',
-      tasks: DEPARTMENTS.map((dept) => ({
+      tasks: DEPARTMENTS.map((dept, index) => ({
         dept,
-        status: 'In Progress',
+        status: index === 0 ? 'In Progress' : 'Pending',
         assignee: '',
         remark: '',
         nextDeptRemark: '',
@@ -71,6 +71,37 @@ export function buildNewOrder(
       })),
       createdAt: options?.createdAt ?? new Date().toISOString().split('T')[0],
     } satisfies Order,
+  }
+}
+
+export function updateTaskStatusAndAdvance(
+  tasks: Task[],
+  taskIndex: number,
+  status: Task['status'],
+) {
+  const nextTasks = tasks.map((task) => ({ ...task }))
+  const currentTask = nextTasks[taskIndex]
+
+  if (!currentTask) {
+    return { nextTaskIndex: taskIndex, tasks: nextTasks }
+  }
+
+  currentTask.status = status
+
+  if (status !== 'On Hold') {
+    currentTask.holdReason = ''
+  }
+
+  const isFinished = status === 'Completed' || status === 'Dispatched'
+  const nextTask = nextTasks[taskIndex + 1]
+
+  if (isFinished && nextTask?.status === 'Pending') {
+    nextTask.status = 'In Progress'
+  }
+
+  return {
+    nextTaskIndex: isFinished && nextTask ? taskIndex + 1 : taskIndex,
+    tasks: nextTasks,
   }
 }
 

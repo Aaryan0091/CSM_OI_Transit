@@ -7,7 +7,7 @@ export type Department =
   | 'Dispatch'
 
 export type UserDepartment = Department | 'Admin'
-export type Status = 'In Progress' | 'On Hold' | 'Completed' | 'Dispatched'
+export type Status = 'Pending' | 'In Progress' | 'On Hold' | 'Completed' | 'Dispatched'
 export type Priority = 'Low' | 'Medium' | 'High' | 'Critical'
 export type Company = 'CSM' | 'Oriental'
 
@@ -37,7 +37,7 @@ export type Order = {
   description: string
   deadline: string
   priority: Priority
-  overallStatus: Exclude<Status, 'Dispatched'>
+  overallStatus: Exclude<Status, 'Pending' | 'Dispatched'>
   tasks: Task[]
   createdAt: string
   lastActivityId?: string
