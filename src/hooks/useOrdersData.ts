@@ -12,17 +12,20 @@ export function useOrdersData(currentUser: User | null) {
   const [search, setSearch] = useState('')
   const [companyFilter, setCompanyFilter] = useState<'All' | Company>('All')
   const [deptFilter, setDeptFilter] = useState<'All' | Department>('All')
-  const [isLoadingOrders, setIsLoadingOrders] = useState(isFirebaseConfigured)
+  const [isLoadingOrders, setIsLoadingOrders] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
 
     async function bootstrapOrders() {
-      if (!isFirebaseConfigured) {
+      if (!isFirebaseConfigured || !currentUser) {
+        setOrders([])
         setIsLoadingOrders(false)
         return
       }
+
+      setIsLoadingOrders(true)
 
       try {
         const firestoreOrders = await loadOrdersFromFirestore()
@@ -50,7 +53,7 @@ export function useOrdersData(currentUser: User | null) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [currentUser])
 
   const handleSave = async (
     id: string,
