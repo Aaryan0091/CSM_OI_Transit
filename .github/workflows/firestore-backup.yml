@@ -1,0 +1,57 @@
+name: Firestore Backup
+
+on:
+  schedule:
+    - cron: '30 2 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firestore-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Export Firestore
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Export Firestore
+        run: npm run backup-firestore -- "${{ runner.temp }}/firestore-backups"
+
+      - name: Encrypt backup
+        env:
+          BACKUP_ENCRYPTION_PASSWORD: ${{ secrets.BACKUP_ENCRYPTION_PASSWORD }}
+        run: |
+          tar -czf - -C "${{ runner.temp }}/firestore-backups" . \
+            | openssl enc -aes-256-cbc -salt -pbkdf2 \
+                -out "${{ runner.temp }}/firestore-backup.tar.gz.enc" \
+                -pass env:BACKUP_ENCRYPTION_PASSWORD
+
+      - name: Upload encrypted backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: firestore-backup-${{ github.run_number }}
+          path: ${{ runner.temp }}/firestore-backup.tar.gz.enc
+          if-no-files-found: error
+          retention-days: 30

@@ -104,6 +104,8 @@ Every order create/update is committed atomically with an immutable activity ent
 - Optional Firebase App Check support uses `VITE_FIREBASE_APP_CHECK_SITE_KEY`.
 - Verification and password-reset emails return to `VITE_APP_URL` when configured.
 - `npm run backup-firestore -- /absolute/output/directory` creates a private JSON export outside the repository.
+- `.github/workflows/firestore-backup.yml` creates a weekly backup artifact after the repository owner configures its Firebase credential secret.
+- Order dialogs are loaded only when opened, and stable dependencies are split into cacheable production chunks.
 - See `FIREBASE_SETUP.md` for the safe App Check rollout and Firebase email-template settings.
 
 ## Scripts

@@ -1,15 +1,25 @@
+import { lazy, Suspense } from 'react'
 import { LoginScreen } from './components/auth/LoginScreen'
 import { AppHeader } from './components/dashboard/AppHeader'
 import { OrdersList } from './components/dashboard/OrdersList'
 import { OrdersToolbar } from './components/dashboard/OrdersToolbar'
 import { StatsGrid } from './components/dashboard/StatsGrid'
 import { StatusBanner } from './components/dashboard/StatusBanner'
-import { AddOrderModal } from './components/orders/AddOrderModal'
-import { OrderModal } from './components/orders/OrderModal'
 import { THEMES } from './data/constants'
 import { isFirebaseConfigured } from './lib/firebase'
 import { useAuthSession } from './hooks/useAuthSession'
 import { useOrdersData } from './hooks/useOrdersData'
+
+const AddOrderModal = lazy(() =>
+  import('./components/orders/AddOrderModal').then((module) => ({
+    default: module.AddOrderModal,
+  })),
+)
+const OrderModal = lazy(() =>
+  import('./components/orders/OrderModal').then((module) => ({
+    default: module.OrderModal,
+  })),
+)
 
 export default function App() {
   const {
@@ -143,18 +153,20 @@ export default function App() {
         <OrdersList orders={filtered} theme={theme} onSelect={setSelected} />
       </div>
 
-      {selected && (
-        <OrderModal
-          order={selected}
-          onClose={() => setSelected(null)}
-          onSave={handleSave}
-          currentUser={currentUser}
-          theme={theme}
-        />
-      )}
-      {addOpen && currentUser.dept === 'Admin' && (
-        <AddOrderModal onClose={() => setAddOpen(false)} onAdd={handleAdd} theme={theme} />
-      )}
+      <Suspense fallback={null}>
+        {selected && (
+          <OrderModal
+            order={selected}
+            onClose={() => setSelected(null)}
+            onSave={handleSave}
+            currentUser={currentUser}
+            theme={theme}
+          />
+        )}
+        {addOpen && currentUser.dept === 'Admin' && (
+          <AddOrderModal onClose={() => setAddOpen(false)} onAdd={handleAdd} theme={theme} />
+        )}
+      </Suspense>
     </div>
   )
 }

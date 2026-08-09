@@ -62,3 +62,34 @@ Firebase scheduled backups require Blaze, so use the local backup command:
 5. Keep a second encrypted copy on another protected device or storage provider.
 
 Run a backup before major releases and at least weekly while the app contains active orders.
+
+### Weekly GitHub backup
+
+The repository includes `.github/workflows/firestore-backup.yml`. It runs every Sunday at 02:30 UTC and can also be started manually from **GitHub > Actions > Firestore Backup**.
+
+The repository owner must configure it once:
+
+1. Create a dedicated Firebase service account with only the Firestore read permissions needed for backups.
+2. Download its JSON key and keep it outside the repository.
+3. Open **GitHub repository > Settings > Secrets and variables > Actions**.
+4. Create a repository secret named `FIREBASE_SERVICE_ACCOUNT`.
+5. Paste the complete service-account JSON as the secret value.
+6. Generate a long, unique backup password and store it in a password manager.
+7. Create a second repository secret named `BACKUP_ENCRYPTION_PASSWORD` with that password.
+8. Open **Actions > Firestore Backup > Run workflow** and confirm that the first run succeeds.
+9. Download the encrypted artifact and verify that it can be decrypted.
+
+Decrypt a downloaded artifact locally without putting the password in shell history:
+
+```bash
+read -s BACKUP_ENCRYPTION_PASSWORD
+export BACKUP_ENCRYPTION_PASSWORD
+openssl enc -d -aes-256-cbc -pbkdf2 \
+  -in firestore-backup.tar.gz.enc \
+  -out firestore-backup.tar.gz \
+  -pass env:BACKUP_ENCRYPTION_PASSWORD
+tar -xzf firestore-backup.tar.gz
+unset BACKUP_ENCRYPTION_PASSWORD
+```
+
+Each workflow artifact is retained for 30 days. Keep an additional encrypted copy outside GitHub for long-term recovery. Limit repository administration and workflow-editing access because workflows can use repository secrets.
