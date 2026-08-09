@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase/app'
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check'
 import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
@@ -14,6 +15,16 @@ const firebaseConfig = {
 export const isFirebaseConfigured = Object.values(firebaseConfig).every(Boolean)
 
 const app = isFirebaseConfigured ? initializeApp(firebaseConfig) : null
+const appCheckSiteKey = import.meta.env.VITE_FIREBASE_APP_CHECK_SITE_KEY
+
+export const isAppCheckConfigured = Boolean(app && appCheckSiteKey)
+
+if (app && appCheckSiteKey) {
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider(appCheckSiteKey),
+    isTokenAutoRefreshEnabled: true,
+  })
+}
 
 export const auth = app ? getAuth(app) : null
 export const db = app ? getFirestore(app) : null

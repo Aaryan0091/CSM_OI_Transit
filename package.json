@@ -6,13 +6,16 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "backup-firestore": "node scripts/backupFirestore.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "set-admin-claim": "node scripts/setAdminClaim.mjs",
     "test": "vitest run",
-    "test:rules": "firebase emulators:exec --only firestore \"vitest run --config vitest.rules.config.ts\""
+    "test:rules": "PATH=/opt/homebrew/opt/openjdk@21/bin:$PATH firebase emulators:exec --only firestore \"vitest run --config vitest.rules.config.ts\""
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "firebase": "^12.15.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"

@@ -13,6 +13,12 @@ import { doc, setDoc } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
 import type { UserDepartment } from '../types'
 
+const appUrl = import.meta.env.VITE_APP_URL
+
+function emailActionSettings() {
+  return appUrl ? { url: appUrl } : undefined
+}
+
 export function subscribeToAuthChanges(
   callback: (firebaseUser: FirebaseAuthUser | null) => void | Promise<void>,
 ) {
@@ -55,7 +61,7 @@ export async function signUpWithEmail(payload: {
       email: payload.email,
     })
 
-    await sendEmailVerification(credential.user)
+    await sendEmailVerification(credential.user, emailActionSettings())
   } catch (error) {
     let rollbackSucceeded = false
 
@@ -92,7 +98,7 @@ export async function sendPasswordResetLink(email: string) {
     throw new Error('Firebase Auth is not configured yet.')
   }
 
-  await sendPasswordResetEmail(auth, email)
+  await sendPasswordResetEmail(auth, email, emailActionSettings())
 }
 
 export async function sendCurrentUserVerificationEmail() {
@@ -100,7 +106,7 @@ export async function sendCurrentUserVerificationEmail() {
     throw new Error('No signed-in user is available for email verification.')
   }
 
-  await sendEmailVerification(auth.currentUser)
+  await sendEmailVerification(auth.currentUser, emailActionSettings())
 }
 
 export async function reloadCurrentAuthUser() {

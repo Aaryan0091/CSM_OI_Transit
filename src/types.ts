@@ -40,6 +40,17 @@ export type Order = {
   overallStatus: Exclude<Status, 'Dispatched'>
   tasks: Task[]
   createdAt: string
+  lastActivityId?: string
+}
+
+export type OrderActivity = {
+  id: string
+  actorUid: string
+  actorName: string
+  actorDept: UserDepartment
+  action: 'created' | 'updated'
+  summary: string
+  createdAt: string
 }
 
 export type StatusMeta = Record<

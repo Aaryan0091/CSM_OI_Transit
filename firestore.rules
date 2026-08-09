@@ -36,6 +36,10 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.dept;
     }
 
+    function currentUserName() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.name;
+    }
+
     match /users/{userId} {
       allow read: if (isVerified() && isOwnProfile(userId)) || isAdmin();
 
@@ -127,7 +131,8 @@ service cloud.firestore {
           'priority',
           'overallStatus',
           'tasks',
-          'createdAt'
+          'createdAt',
+          'lastActivityId'
         ]) &&
         data.id == orderId &&
         data.company in ['CSM', 'Oriental'] &&
@@ -143,6 +148,8 @@ service cloud.firestore {
         data.deadline.size() > 0 &&
         data.priority in ['Low', 'Medium', 'High', 'Critical'] &&
         data.createdAt is string &&
+        data.lastActivityId is string &&
+        data.lastActivityId.size() > 0 &&
         data.tasks is list &&
         data.tasks.size() == 6 &&
         isValidTask(data.tasks[0], 'Sales') &&
@@ -174,14 +181,62 @@ service cloud.firestore {
         (editableIndex == 5 || before.tasks[5] == after.tasks[5]);
     }
 
+    function isValidDepartmentUpdate(data, department) {
+      return isDepartment(department) &&
+        data.lastActivityId is string &&
+        data.lastActivityId.size() > 0 &&
+        data.tasks is list &&
+        data.tasks.size() == 6 &&
+        isValidTask(data.tasks[departmentIndex(department)], department) &&
+        hasValidOverallStatus(data);
+    }
+
+    function hasNewMatchingActivity(data, orderId) {
+      let activityPath = /databases/$(database)/documents/orders/$(orderId)/activity/$(data.lastActivityId);
+      return !exists(activityPath) && existsAfter(activityPath);
+    }
+
+    function isValidActivity(data, orderId) {
+      return data.keys().hasOnly([
+          'actorUid',
+          'actorName',
+          'actorDept',
+          'action',
+          'summary',
+          'createdAt'
+        ]) &&
+        data.actorUid == request.auth.uid &&
+        data.actorName == currentUserName() &&
+        data.actorDept == (isAdmin() ? 'Admin' : currentUserDepartment()) &&
+        data.action == (
+          exists(/databases/$(database)/documents/orders/$(orderId))
+            ? 'updated'
+            : 'created'
+        ) &&
+        data.summary is string &&
+        data.summary.size() > 0 &&
+        data.summary.size() <= 5000 &&
+        data.createdAt == request.time;
+    }
+
     match /orders/{orderId} {
       allow read: if isVerified();
-      allow create: if isAdmin() && isValidOrder(request.resource.data, orderId);
-      allow update: if isValidOrder(request.resource.data, orderId) && (
-        isAdmin() ||
+      allow create: if isAdmin() &&
+        isValidOrder(request.resource.data, orderId) &&
+        hasNewMatchingActivity(request.resource.data, orderId);
+      allow update: if hasNewMatchingActivity(request.resource.data, orderId) && (
+        (isAdmin() && isValidOrder(request.resource.data, orderId)) ||
         (
           isVerified() &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tasks', 'overallStatus']) &&
+          isValidDepartmentUpdate(
+            request.resource.data,
+            currentUserDepartment()
+          ) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'tasks',
+            'overallStatus',
+            'lastActivityId'
+          ]) &&
           onlyDepartmentTaskChanged(
             resource.data,
             request.resource.data,
@@ -190,6 +245,14 @@ service cloud.firestore {
         )
       );
       allow delete: if isAdmin();
+
+      match /activity/{activityId} {
+        allow read: if isVerified();
+        allow create: if isVerified() &&
+          isValidActivity(request.resource.data, orderId) &&
+          getAfter(/databases/$(database)/documents/orders/$(orderId)).data.lastActivityId == activityId;
+        allow update, delete: if false;
+      }
     }
 
     function isValidAdminRequest(data) {

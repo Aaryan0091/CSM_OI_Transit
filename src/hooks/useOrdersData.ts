@@ -58,18 +58,19 @@ export function useOrdersData(currentUser: User | null) {
       return
     }
 
-    let updatedOrder: Order | null = null
+    const originalOrder = orders.find((order) => order.id === id)
+
+    if (!originalOrder) {
+      setSyncError('This order is no longer available. Please refresh and try again.')
+      return
+    }
+
+    let updatedOrder: Order
 
     try {
+      updatedOrder = applyOrderUpdates(originalOrder, updates, currentUser)
       setOrders((previous) =>
-        previous.map((order) => {
-          if (order.id !== id) {
-            return order
-          }
-
-          updatedOrder = applyOrderUpdates(order, updates, currentUser)
-          return updatedOrder
-        }),
+        previous.map((order) => (order.id === id ? updatedOrder : order)),
       )
       setSyncError(null)
     } catch (error) {
@@ -79,12 +80,12 @@ export function useOrdersData(currentUser: User | null) {
 
     setSelected(null)
 
-    if (!updatedOrder || !isFirebaseConfigured) {
+    if (!isFirebaseConfigured) {
       return
     }
 
     try {
-      await saveOrderToFirestore(updatedOrder)
+      await saveOrderToFirestore(updatedOrder, currentUser, originalOrder)
       setSyncError(null)
     } catch (error) {
       console.error('Failed to save Firestore order:', error)
@@ -93,7 +94,7 @@ export function useOrdersData(currentUser: User | null) {
   }
 
   const handleAdd = async (order: Order) => {
-    if (!canCreateOrders(currentUser)) {
+    if (!currentUser || !canCreateOrders(currentUser)) {
       setSyncError('Only admins can create new orders.')
       return
     }
@@ -108,7 +109,7 @@ export function useOrdersData(currentUser: User | null) {
     }
 
     try {
-      await saveOrderToFirestore(order)
+      await saveOrderToFirestore(order, currentUser, null)
       setSyncError(null)
     } catch (error) {
       console.error('Failed to create Firestore order:', error)

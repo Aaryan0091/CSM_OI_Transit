@@ -96,6 +96,16 @@ The code in `functions/` is reserved for a future automated email-approval workf
 
 The dashboard subscribes to Firestore while a verified user is signed in. Order changes made by other employees appear automatically without refreshing the page, and the listener is removed when the user signs out.
 
+Every order create/update is committed atomically with an immutable activity entry containing the authenticated actor, department, change summary, and Firestore server timestamp.
+
+## Production Operations
+
+- Vercel Web Analytics and Speed Insights are initialized in the frontend.
+- Optional Firebase App Check support uses `VITE_FIREBASE_APP_CHECK_SITE_KEY`.
+- Verification and password-reset emails return to `VITE_APP_URL` when configured.
+- `npm run backup-firestore -- /absolute/output/directory` creates a private JSON export outside the repository.
+- See `FIREBASE_SETUP.md` for the safe App Check rollout and Firebase email-template settings.
+
 ## Scripts
 
 - `npm run dev`

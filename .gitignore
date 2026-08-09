@@ -30,3 +30,7 @@ functions/.env
 # Firebase Admin credentials must never be committed
 *-firebase-adminsdk-*.json
 service-account*.json
+
+# Firestore exports contain private business data
+backups/
+firestore-backup-*.json
