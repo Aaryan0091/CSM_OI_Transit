@@ -26,3 +26,7 @@ dist-ssr
 # Environment variables
 .env
 functions/.env
+
+# Firebase Admin credentials must never be committed
+*-firebase-adminsdk-*.json
+service-account*.json

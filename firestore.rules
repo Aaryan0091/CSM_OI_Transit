@@ -6,8 +6,12 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
     function isAdmin() {
-      return isSignedIn() && request.auth.token.admin == true;
+      return isVerified() && request.auth.token.admin == true;
     }
 
     function isDepartment(value) {
@@ -28,8 +32,12 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function currentUserDepartment() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.dept;
+    }
+
     match /users/{userId} {
-      allow read: if isOwnProfile(userId) || isAdmin();
+      allow read: if (isVerified() && isOwnProfile(userId)) || isAdmin();
 
       allow create: if isOwnProfile(userId) &&
         isValidUserProfile(request.resource.data) &&
@@ -38,6 +46,7 @@ service cloud.firestore {
       allow update: if
         (isAdmin() && isValidUserProfile(request.resource.data)) ||
         (
+          isVerified() &&
           isOwnProfile(userId) &&
           isValidUserProfile(request.resource.data) &&
           request.resource.data.dept == resource.data.dept
@@ -46,10 +55,141 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    function isValidTask(task, expectedDepartment) {
+      return task.keys().hasOnly([
+          'dept',
+          'status',
+          'assignee',
+          'remark',
+          'nextDeptRemark',
+          'nextDeptRemarkTarget',
+          'holdReason'
+        ]) &&
+        task.dept == expectedDepartment &&
+        task.status in ['In Progress', 'On Hold', 'Completed', 'Dispatched'] &&
+        task.assignee is string &&
+        task.assignee.size() <= 200 &&
+        task.remark is string &&
+        task.remark.size() <= 5000 &&
+        task.nextDeptRemark is string &&
+        task.nextDeptRemark.size() <= 5000 &&
+        task.nextDeptRemarkTarget is string &&
+        (task.nextDeptRemarkTarget == '' || isDepartment(task.nextDeptRemarkTarget)) &&
+        task.holdReason is string &&
+        task.holdReason.size() <= 5000 &&
+        (task.status != 'On Hold' || task.holdReason.size() > 0);
+    }
+
+    function hasValidOverallStatus(data) {
+      return (
+          data.tasks[0].status in ['Completed', 'Dispatched'] &&
+          data.tasks[1].status in ['Completed', 'Dispatched'] &&
+          data.tasks[2].status in ['Completed', 'Dispatched'] &&
+          data.tasks[3].status in ['Completed', 'Dispatched'] &&
+          data.tasks[4].status in ['Completed', 'Dispatched'] &&
+          data.tasks[5].status in ['Completed', 'Dispatched'] &&
+          data.overallStatus == 'Completed'
+        ) || (
+          (
+            data.tasks[0].status == 'On Hold' ||
+            data.tasks[1].status == 'On Hold' ||
+            data.tasks[2].status == 'On Hold' ||
+            data.tasks[3].status == 'On Hold' ||
+            data.tasks[4].status == 'On Hold' ||
+            data.tasks[5].status == 'On Hold'
+          ) &&
+          data.overallStatus == 'On Hold'
+        ) || (
+          !(data.tasks[0].status in ['Completed', 'Dispatched'] &&
+            data.tasks[1].status in ['Completed', 'Dispatched'] &&
+            data.tasks[2].status in ['Completed', 'Dispatched'] &&
+            data.tasks[3].status in ['Completed', 'Dispatched'] &&
+            data.tasks[4].status in ['Completed', 'Dispatched'] &&
+            data.tasks[5].status in ['Completed', 'Dispatched']) &&
+          data.tasks[0].status != 'On Hold' &&
+          data.tasks[1].status != 'On Hold' &&
+          data.tasks[2].status != 'On Hold' &&
+          data.tasks[3].status != 'On Hold' &&
+          data.tasks[4].status != 'On Hold' &&
+          data.tasks[5].status != 'On Hold' &&
+          data.overallStatus == 'In Progress'
+        );
+    }
+
+    function isValidOrder(data, orderId) {
+      return data.keys().hasOnly([
+          'id',
+          'company',
+          'client',
+          'product',
+          'description',
+          'deadline',
+          'priority',
+          'overallStatus',
+          'tasks',
+          'createdAt'
+        ]) &&
+        data.id == orderId &&
+        data.company in ['CSM', 'Oriental'] &&
+        data.client is string &&
+        data.client.size() > 0 &&
+        data.client.size() <= 300 &&
+        data.product is string &&
+        data.product.size() > 0 &&
+        data.product.size() <= 300 &&
+        data.description is string &&
+        data.description.size() <= 5000 &&
+        data.deadline is string &&
+        data.deadline.size() > 0 &&
+        data.priority in ['Low', 'Medium', 'High', 'Critical'] &&
+        data.createdAt is string &&
+        data.tasks is list &&
+        data.tasks.size() == 6 &&
+        isValidTask(data.tasks[0], 'Sales') &&
+        isValidTask(data.tasks[1], 'Design') &&
+        isValidTask(data.tasks[2], 'Procurement') &&
+        isValidTask(data.tasks[3], 'Production') &&
+        isValidTask(data.tasks[4], 'QC') &&
+        isValidTask(data.tasks[5], 'Dispatch') &&
+        hasValidOverallStatus(data);
+    }
+
+    function departmentIndex(department) {
+      return department == 'Sales' ? 0 :
+        department == 'Design' ? 1 :
+        department == 'Procurement' ? 2 :
+        department == 'Production' ? 3 :
+        department == 'QC' ? 4 :
+        department == 'Dispatch' ? 5 : -1;
+    }
+
+    function onlyDepartmentTaskChanged(before, after, department) {
+      let editableIndex = departmentIndex(department);
+      return isDepartment(department) &&
+        (editableIndex == 0 || before.tasks[0] == after.tasks[0]) &&
+        (editableIndex == 1 || before.tasks[1] == after.tasks[1]) &&
+        (editableIndex == 2 || before.tasks[2] == after.tasks[2]) &&
+        (editableIndex == 3 || before.tasks[3] == after.tasks[3]) &&
+        (editableIndex == 4 || before.tasks[4] == after.tasks[4]) &&
+        (editableIndex == 5 || before.tasks[5] == after.tasks[5]);
+    }
+
     match /orders/{orderId} {
-      allow read: if isSignedIn();
-      allow create, delete: if isAdmin();
-      allow update: if isSignedIn();
+      allow read: if isVerified();
+      allow create: if isAdmin() && isValidOrder(request.resource.data, orderId);
+      allow update: if isValidOrder(request.resource.data, orderId) && (
+        isAdmin() ||
+        (
+          isVerified() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tasks', 'overallStatus']) &&
+          onlyDepartmentTaskChanged(
+            resource.data,
+            request.resource.data,
+            currentUserDepartment()
+          )
+        )
+      );
+      allow delete: if isAdmin();
     }
 
     function isValidAdminRequest(data) {
@@ -73,9 +213,9 @@ service cloud.firestore {
     }
 
     match /adminRequests/{requestId} {
-      allow read: if isAdmin() || (isSignedIn() && resource.data.requesterUid == request.auth.uid);
+      allow read: if isAdmin() || (isVerified() && resource.data.requesterUid == request.auth.uid);
 
-      allow create: if isSignedIn() &&
+      allow create: if isVerified() &&
         request.resource.data.requesterUid == request.auth.uid &&
         request.resource.data.status == 'pending' &&
         request.resource.data.approvedAt == null &&

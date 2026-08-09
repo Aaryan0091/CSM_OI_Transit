@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'jsdom',
+    exclude: ['tests/firestore.rules.test.ts', '**/node_modules/**', '**/.git/**'],
     globals: true,
   },
 })
