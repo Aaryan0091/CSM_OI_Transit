@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { isFirebaseConfigured } from '../lib/firebase'
-import { loadOrdersFromFirestore, saveOrderToFirestore } from '../services/orders'
+import { saveOrderToFirestore, subscribeToOrders } from '../services/orders'
 import type { Company, Department, Order, Task, User } from '../types'
 import { applyOrderUpdates, canCreateOrders } from '../utils/orderActions'
 
 export function useOrdersData(currentUser: User | null) {
+  const currentUserId = currentUser?.uid
   const [orders, setOrders] = useState<Order[]>([])
   const [selected, setSelected] = useState<Order | null>(null)
   const [addOpen, setAddOpen] = useState(false)
@@ -12,48 +13,41 @@ export function useOrdersData(currentUser: User | null) {
   const [search, setSearch] = useState('')
   const [companyFilter, setCompanyFilter] = useState<'All' | Company>('All')
   const [deptFilter, setDeptFilter] = useState<'All' | Department>('All')
-  const [isLoadingOrders, setIsLoadingOrders] = useState(false)
+  const [loadedForUserId, setLoadedForUserId] = useState<string | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
 
   useEffect(() => {
-    let cancelled = false
+    if (!isFirebaseConfigured || !currentUserId) {
+      return
+    }
 
-    async function bootstrapOrders() {
-      if (!isFirebaseConfigured || !currentUser) {
+    return subscribeToOrders(
+      (firestoreOrders) => {
+        setOrders(firestoreOrders)
+        setLoadedForUserId(currentUserId)
+        setSelected((previous) =>
+          previous
+            ? firestoreOrders.find((order) => order.id === previous.id) ?? null
+            : null,
+        )
+        setSyncError(null)
+      },
+      (error) => {
+        console.error('Failed to subscribe to Firestore orders:', error)
         setOrders([])
-        setIsLoadingOrders(false)
-        return
-      }
+        setLoadedForUserId(currentUserId)
+        setSyncError('Live order updates stopped. Check your connection and sign in again.')
+      },
+    )
+  }, [currentUserId])
 
-      setIsLoadingOrders(true)
-
-      try {
-        const firestoreOrders = await loadOrdersFromFirestore()
-
-        if (!cancelled) {
-          setOrders(firestoreOrders)
-          setSyncError(null)
-        }
-      } catch (error) {
-        console.error('Failed to load Firestore orders:', error)
-
-        if (!cancelled) {
-          setOrders([])
-          setSyncError('Could not load Firestore orders. Check your Firebase rules and connection.')
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingOrders(false)
-        }
-      }
-    }
-
-    bootstrapOrders()
-
-    return () => {
-      cancelled = true
-    }
-  }, [currentUser])
+  const hasLoadedCurrentUser = Boolean(
+    currentUserId && loadedForUserId === currentUserId,
+  )
+  const visibleOrders = hasLoadedCurrentUser ? orders : []
+  const isLoadingOrders = Boolean(
+    isFirebaseConfigured && currentUserId && !hasLoadedCurrentUser,
+  )
 
   const handleSave = async (
     id: string,
@@ -123,7 +117,7 @@ export function useOrdersData(currentUser: User | null) {
     }
   }
 
-  const filtered = orders.filter((order) => {
+  const filtered = visibleOrders.filter((order) => {
     const query = search.toLowerCase()
     const matchStatus = filter === 'All' || order.overallStatus === filter
     const matchCompany = companyFilter === 'All' || order.company === companyFilter
@@ -144,10 +138,10 @@ export function useOrdersData(currentUser: User | null) {
   })
 
   const stats = {
-    total: orders.length,
-    inProgress: orders.filter((order) => order.overallStatus === 'In Progress').length,
-    onHold: orders.filter((order) => order.overallStatus === 'On Hold').length,
-    completed: orders.filter((order) => order.overallStatus === 'Completed').length,
+    total: visibleOrders.length,
+    inProgress: visibleOrders.filter((order) => order.overallStatus === 'In Progress').length,
+    onHold: visibleOrders.filter((order) => order.overallStatus === 'On Hold').length,
+    completed: visibleOrders.filter((order) => order.overallStatus === 'Completed').length,
   }
 
   return {

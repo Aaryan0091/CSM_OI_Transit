@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { THEMES } from '../../data/constants'
 import type { User } from '../../types'
@@ -13,9 +13,7 @@ function renderHeader(user: User, overrides?: Partial<Parameters<typeof AppHeade
     themeMode: 'light' as const,
     onToggleTheme: vi.fn(),
     onOpenNewOrder: vi.fn(),
-    onRequestAdminAccess: vi.fn(),
     onSignOut: vi.fn(),
-    isRequestingAdmin: false,
     ...overrides,
   }
 
@@ -34,11 +32,11 @@ describe('AppHeader admin gating', () => {
     })
 
     expect(screen.queryByText('+ New Order')).not.toBeNull()
-    expect(screen.queryByText('Request Admin Access')).toBeNull()
+    expect(screen.queryByText('Admin access: contact owner')).toBeNull()
   })
 
-  it('shows admin request for non-admin users and fires the callback', () => {
-    const props = renderHeader({
+  it('tells non-admin users to contact the owner for admin access', () => {
+    renderHeader({
       uid: '2',
       email: 'design@company.com',
       emailVerified: true,
@@ -46,10 +44,7 @@ describe('AppHeader admin gating', () => {
       dept: 'Design',
     })
 
-    const requestButton = screen.getByText('Request Admin Access')
     expect(screen.queryByText('+ New Order')).toBeNull()
-
-    fireEvent.click(requestButton)
-    expect(props.onRequestAdminAccess).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText('Admin access: contact owner')).not.toBeNull()
   })
 })

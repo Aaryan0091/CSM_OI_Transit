@@ -1,7 +1,5 @@
 export const AUTH_COPY = {
-  adminRequestButton: 'Request Admin Access',
-  adminRequestPending:
-    'Your admin access request has been sent for approval. After it is approved, sign out and sign back in to get admin access.',
+  adminAccessHelp: 'Admin access is assigned manually. Contact the project owner.',
   departmentSignupHelp:
     'New users can create department accounts here. After sign up, check your inbox and spam folder for the verification email. Admin accounts are assigned separately.',
   emailVerificationSent:
@@ -21,7 +19,5 @@ export const AUTH_COPY = {
     'Password reset email sent. Please check your inbox and spam folder.',
   profileHelp:
     'Sign in with your Firebase email/password account. The matching role for this user should exist in Firestore under the `users` collection using the auth UID as the document id.',
-  requestAdminHelp:
-    'Need admin access? Send a request and the main administrator can approve it by email. After approval, sign out and sign back in.',
   workEmailMissing: 'Please enter your work email.',
 } as const

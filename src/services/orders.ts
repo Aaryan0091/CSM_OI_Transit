@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, setDoc } from 'firebase/firestore/lite'
+import { collection, doc, onSnapshot, setDoc } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import type { Order } from '../types'
 import { normalizeOrder } from '../utils/orders'
@@ -11,13 +11,22 @@ export async function saveOrderToFirestore(order: Order) {
   await setDoc(doc(db, 'orders', order.id), order)
 }
 
-export async function loadOrdersFromFirestore() {
+export function subscribeToOrders(
+  onOrders: (orders: Order[]) => void,
+  onError: (error: Error) => void,
+) {
   if (!db) {
-    return []
+    onOrders([])
+    return () => {}
   }
 
-  const snapshot = await getDocs(collection(db, 'orders'))
-  const orders = snapshot.docs.map((entry) => normalizeOrder(entry.data() as Order))
+  return onSnapshot(
+    collection(db, 'orders'),
+    (snapshot) => {
+      const orders = snapshot.docs.map((entry) => normalizeOrder(entry.data() as Order))
 
-  return orders.sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      onOrders(orders.sort((left, right) => right.createdAt.localeCompare(left.createdAt)))
+    },
+    onError,
+  )
 }

@@ -9,7 +9,7 @@ import {
   signOut,
   type User as FirebaseAuthUser,
 } from 'firebase/auth'
-import { doc, setDoc } from 'firebase/firestore/lite'
+import { doc, setDoc } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
 import type { UserDepartment } from '../types'
 

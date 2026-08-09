@@ -8,7 +8,6 @@ import { AddOrderModal } from './components/orders/AddOrderModal'
 import { OrderModal } from './components/orders/OrderModal'
 import { THEMES } from './data/constants'
 import { isFirebaseConfigured } from './lib/firebase'
-import { useAdminRequest } from './hooks/useAdminRequest'
 import { useAuthSession } from './hooks/useAuthSession'
 import { useOrdersData } from './hooks/useOrdersData'
 
@@ -31,12 +30,6 @@ export default function App() {
     themeMode,
   } = useAuthSession()
   const theme = THEMES[themeMode]
-  const {
-    isRequestingAdmin,
-    requestAdminAccess,
-    requestError,
-    requestMessage,
-  } = useAdminRequest(currentUser)
   const {
     addOpen,
     companyFilter,
@@ -111,9 +104,7 @@ export default function App() {
         themeMode={themeMode}
         onToggleTheme={() => setThemeMode((previous) => (previous === 'light' ? 'dark' : 'light'))}
         onOpenNewOrder={() => setAddOpen(true)}
-        onRequestAdminAccess={requestAdminAccess}
         onSignOut={handleSignOut}
-        isRequestingAdmin={isRequestingAdmin}
       />
 
       {isLoadingOrders && (
@@ -134,14 +125,6 @@ export default function App() {
 
       {authMessage && (
         <StatusBanner message={authMessage} tone="info" theme={theme} />
-      )}
-
-      {requestError && (
-        <StatusBanner message={requestError} tone="error" theme={theme} />
-      )}
-
-      {requestMessage && (
-        <StatusBanner message={requestMessage} tone="info" theme={theme} />
       )}
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px' }}>

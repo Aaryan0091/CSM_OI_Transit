@@ -8,18 +8,14 @@ export function AppHeader({
   themeMode,
   onToggleTheme,
   onOpenNewOrder,
-  onRequestAdminAccess,
   onSignOut,
-  isRequestingAdmin,
 }: {
   currentUser: User
   theme: Theme
   themeMode: ThemeMode
   onToggleTheme: () => void
   onOpenNewOrder: () => void
-  onRequestAdminAccess: () => void
   onSignOut: () => void
-  isRequestingAdmin: boolean
 }) {
   return (
     <div
@@ -95,23 +91,20 @@ export function AppHeader({
           </button>
         )}
         {currentUser.dept !== 'Admin' && (
-          <button
-            onClick={onRequestAdminAccess}
+          <div
+            title={AUTH_COPY.adminAccessHelp}
             style={{
-              background: '#a8f5e9',
-              color: '#123850',
-              border: 'none',
+              background: 'transparent',
+              color: theme.textSoft,
+              border: `1px solid ${theme.headerBorder}`,
               borderRadius: 8,
               padding: '7px 16px',
               fontWeight: 700,
-              fontSize: 13,
-              cursor: isRequestingAdmin ? 'wait' : 'pointer',
-              opacity: isRequestingAdmin ? 0.8 : 1,
+              fontSize: 11,
             }}
-            disabled={isRequestingAdmin}
           >
-            {isRequestingAdmin ? 'Sending Request...' : AUTH_COPY.adminRequestButton}
-          </button>
+            Admin access: contact owner
+          </div>
         )}
         <button
           onClick={onSignOut}

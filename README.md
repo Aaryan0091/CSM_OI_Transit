@@ -81,32 +81,20 @@ This repo includes a helper script for that:
    `npm run set-admin-claim -- user@company.com`
 5. Have that user sign out and sign back in so the updated token is picked up.
 
-## Admin Request Workflow
+## Admin Access Workflow
 
-The app now supports the first half of the approval flow in the frontend:
+Admin access is assigned manually while the project uses Firebase's free plan:
 
-1. A non-admin signed-in user clicks `Request Admin Access`.
-2. The app creates a pending document in `adminRequests`.
-3. A Firebase Function emails the main admin with a secure approval link.
-4. The approval link hits a privileged function that grants the Firebase custom claim `admin: true`.
-5. The requester signs out and signs back in to pick up the new admin token.
+1. The user contacts the project owner outside the app.
+2. The owner verifies the requester's identity and runs:
+   `npm run set-admin-claim -- user@company.com`
+3. The user signs out and signs back in to receive the updated admin token.
 
-Function setup required before this works end to end:
+The code in `functions/` is reserved for a future automated email-approval workflow. It is not part of the active application because deploying Firebase Functions requires the Blaze plan.
 
-1. Copy `functions/.env.example` to a real `functions/.env`.
-   You can also start from `functions/.env.local.example`.
-2. Install function dependencies inside `functions/`.
-3. Deploy the functions in `functions/index.mjs`.
-4. Configure these function environment variables:
-   - `MAIN_ADMIN_EMAIL`
-   - `APPROVAL_BASE_URL`
-   - `ADMIN_APPROVAL_SECRET`
-   - `SMTP_HOST`
-   - `SMTP_PORT`
-   - `SMTP_SECURE`
-   - `SMTP_USER`
-   - `SMTP_PASS`
-   - `SMTP_FROM`
+## Live Order Updates
+
+The dashboard subscribes to Firestore while a verified user is signed in. Order changes made by other employees appear automatically without refreshing the page, and the listener is removed when the user signs out.
 
 ## Scripts
 

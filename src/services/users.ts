@@ -1,5 +1,5 @@
 import type { User as FirebaseAuthUser } from 'firebase/auth'
-import { doc, getDoc } from 'firebase/firestore/lite'
+import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import type { Department, User } from '../types'
 import { isUserDepartment } from '../utils/orders'
