@@ -38,6 +38,19 @@ Sign into an account that can manage `csm-oi-transit`.
 6. Enable enforcement for **Cloud Firestore** only after valid requests are visible.
 7. Enable Authentication enforcement later, after its metrics also show valid requests.
 
+### Local App Check development
+
+Production uses reCAPTCHA normally. Development builds use Firebase's debug provider so localhost can work without adding `localhost` to the reCAPTCHA domain allowlist.
+
+1. Add the public `VITE_FIREBASE_APP_CHECK_SITE_KEY` to your local env file.
+2. Start the development app and open the browser console.
+3. Copy the generated `App Check debug token` without sharing or committing it.
+4. In Firebase, open **App Check > Apps**, open the web app menu, and select **Manage debug tokens**.
+5. Register the token with a label such as `Aaryan local development`.
+6. Refresh localhost and sign in again.
+
+Never add `localhost` to the reCAPTCHA domain list. Delete the registered debug token if the development machine or token is no longer trusted.
+
 ### Authentication email templates
 
 Open **Authentication > Templates** and edit both templates:

@@ -85,39 +85,19 @@ service cloud.firestore {
     }
 
     function hasValidOverallStatus(data) {
-      return (
-          data.tasks[0].status in ['Completed', 'Dispatched'] &&
-          data.tasks[1].status in ['Completed', 'Dispatched'] &&
-          data.tasks[2].status in ['Completed', 'Dispatched'] &&
-          data.tasks[3].status in ['Completed', 'Dispatched'] &&
-          data.tasks[4].status in ['Completed', 'Dispatched'] &&
-          data.tasks[5].status in ['Completed', 'Dispatched'] &&
-          data.overallStatus == 'Completed'
-        ) || (
-          (
-            data.tasks[0].status == 'On Hold' ||
-            data.tasks[1].status == 'On Hold' ||
-            data.tasks[2].status == 'On Hold' ||
-            data.tasks[3].status == 'On Hold' ||
-            data.tasks[4].status == 'On Hold' ||
-            data.tasks[5].status == 'On Hold'
-          ) &&
-          data.overallStatus == 'On Hold'
-        ) || (
-          !(data.tasks[0].status in ['Completed', 'Dispatched'] &&
-            data.tasks[1].status in ['Completed', 'Dispatched'] &&
-            data.tasks[2].status in ['Completed', 'Dispatched'] &&
-            data.tasks[3].status in ['Completed', 'Dispatched'] &&
-            data.tasks[4].status in ['Completed', 'Dispatched'] &&
-            data.tasks[5].status in ['Completed', 'Dispatched']) &&
-          data.tasks[0].status != 'On Hold' &&
-          data.tasks[1].status != 'On Hold' &&
-          data.tasks[2].status != 'On Hold' &&
-          data.tasks[3].status != 'On Hold' &&
-          data.tasks[4].status != 'On Hold' &&
-          data.tasks[5].status != 'On Hold' &&
-          data.overallStatus == 'In Progress'
-        );
+      let statuses = [
+        data.tasks[0].status,
+        data.tasks[1].status,
+        data.tasks[2].status,
+        data.tasks[3].status,
+        data.tasks[4].status,
+        data.tasks[5].status
+      ].toSet();
+      let allFinished = statuses.hasOnly(['Completed', 'Dispatched']);
+      let anyOnHold = statuses.hasAny(['On Hold']);
+      return (data.overallStatus == 'Completed' && allFinished) ||
+        (data.overallStatus == 'On Hold' && anyOnHold) ||
+        (data.overallStatus == 'In Progress' && !allFinished && !anyOnHold);
     }
 
     function isValidOrder(data, orderId) {

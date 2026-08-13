@@ -41,7 +41,10 @@ export function normalizeTask(
   ),
 ): Task {
   return {
-    ...task,
+    dept: task.dept,
+    status: task.status,
+    assignee: task.assignee ?? '',
+    remark: task.remark ?? '',
     holdReason: task.holdReason ?? '',
     nextDeptRemark: task.nextDeptRemark ?? '',
     nextDeptRemarkTarget: task.nextDeptRemarkTarget ?? '',
@@ -50,8 +53,17 @@ export function normalizeTask(
 
 export function normalizeOrder(order: Order): Order {
   return {
-    ...order,
+    id: order.id,
+    company: order.company,
+    client: order.client,
+    product: order.product,
+    description: order.description ?? '',
+    deadline: order.deadline,
+    priority: order.priority,
+    overallStatus: order.overallStatus,
     tasks: order.tasks.map(normalizeTask),
+    createdAt: order.createdAt,
+    ...(order.lastActivityId ? { lastActivityId: order.lastActivityId } : {}),
   }
 }
 

@@ -101,8 +101,10 @@ export function useOrdersData(currentUser: User | null) {
         typeof error === 'object' && error !== null && 'code' in error
           ? String(error.code)
           : ''
-      const message = errorCode.includes('permission-denied')
-        ? 'Firestore denied this update. Deploy the latest rules, confirm App Check, then sign in again.'
+      const message = errorCode.includes('appCheck/') || errorCode.includes('app-check/')
+        ? 'App Check rejected this browser. Register its private localhost debug token or use the production site.'
+        : errorCode.includes('permission-denied')
+          ? 'Firestore rules denied this update. Confirm the latest rules are deployed and sign in again.'
         : errorCode.includes('unavailable') || errorCode.includes('network')
           ? 'Firestore is temporarily unavailable. Check your connection and try again.'
           : 'Order changes could not be saved to Firestore. Please try again.'

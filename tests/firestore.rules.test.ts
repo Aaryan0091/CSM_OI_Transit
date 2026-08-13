@@ -305,4 +305,31 @@ describe('Firestore security rules', () => {
     )
     await assertSucceeds(deleteDoc(orderReference))
   })
+
+  test('allows an admin to complete Design using the client full-document batch', async () => {
+    await seedOrderAndProfiles()
+    const database = authenticatedDatabase(ADMIN_USER_ID, { admin: true })
+    const order = buildOrder('existing-activity')
+    order.tasks = updateTask(order.tasks, 0, { status: 'Completed' })
+
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'orders', ORDER_ID), order)
+    })
+
+    const activityId = 'design-completed'
+    const updatedOrder = {
+      ...order,
+      tasks: updateTask(order.tasks, 1, { status: 'Completed' }),
+      lastActivityId: activityId,
+    }
+    const batch = writeBatch(database)
+
+    batch.set(doc(database, 'orders', ORDER_ID), updatedOrder)
+    batch.set(
+      doc(database, 'orders', ORDER_ID, 'activity', activityId),
+      activityRecord(ADMIN_USER_ID, 'Admin User', 'Admin', 'updated'),
+    )
+
+    await assertSucceeds(batch.commit())
+  })
 })

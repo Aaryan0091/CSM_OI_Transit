@@ -8,7 +8,8 @@ import {
   serverTimestamp,
   writeBatch,
 } from 'firebase/firestore'
-import { db } from '../lib/firebase'
+import { getToken } from 'firebase/app-check'
+import { appCheck, db } from '../lib/firebase'
 import type { Order, OrderActivity, User } from '../types'
 import { describeOrderChanges } from '../utils/orderActivity'
 import { normalizeOrder } from '../utils/orders'
@@ -20,6 +21,10 @@ export async function saveOrderToFirestore(
 ) {
   if (!db) {
     return
+  }
+
+  if (appCheck) {
+    await getToken(appCheck)
   }
 
   const orderReference = doc(db, 'orders', order.id)

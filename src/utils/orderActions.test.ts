@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Order, User } from '../types'
+import type { Order, Task, User } from '../types'
 import {
   applyOrderUpdates,
   buildNewOrder,
@@ -118,6 +118,46 @@ describe('orderActions', () => {
     expect(result.tasks[1].status).toBe('In Progress')
     expect(result.tasks[2].status).toBe('Pending')
     expect(result.nextTaskIndex).toBe(1)
+  })
+
+  it('advances through every department and dispatches the completed order', () => {
+    const order = buildNewOrder(
+      {
+        company: 'CSM',
+        client: 'Lifecycle Client',
+        product: 'Lifecycle Product',
+        description: '',
+        deadline: '2026-09-30',
+        priority: 'High',
+      },
+      { id: 'ORD-201' },
+    ).order!
+    let tasks: Task[] = order.tasks
+
+    for (let index = 0; index < tasks.length - 1; index += 1) {
+      const result = updateTaskStatusAndAdvance(tasks, index, 'Completed')
+      tasks = result.tasks
+
+      expect(tasks[index].status).toBe('Completed')
+      expect(tasks[index + 1].status).toBe('In Progress')
+      expect(result.nextTaskIndex).toBe(index + 1)
+    }
+
+    const dispatched = updateTaskStatusAndAdvance(
+      tasks,
+      tasks.length - 1,
+      'Dispatched',
+    )
+
+    expect(dispatched.tasks.at(-1)?.status).toBe('Dispatched')
+    expect(dispatched.nextTaskIndex).toBe(tasks.length - 1)
+    expect(
+      applyOrderUpdates(
+        order,
+        { deadline: order.deadline, tasks: dispatched.tasks },
+        adminUser,
+      ).overallStatus,
+    ).toBe('Completed')
   })
 
   it('requires a hold reason when a task is on hold', () => {
