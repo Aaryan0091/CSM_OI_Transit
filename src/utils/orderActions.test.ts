@@ -4,6 +4,7 @@ import {
   applyOrderUpdates,
   buildNewOrder,
   canCreateOrders,
+  canDeleteOrders,
   updateTaskStatusAndAdvance,
   validateOrderTasks,
 } from './orderActions'
@@ -22,6 +23,14 @@ const designUser: User = {
   emailVerified: true,
   name: 'Design User',
   dept: 'Design',
+}
+
+const salesUser: User = {
+  uid: 'sales-1',
+  email: 'sales@company.com',
+  emailVerified: true,
+  name: 'Sales User',
+  dept: 'Sales',
 }
 
 const baseOrder: Order = {
@@ -53,6 +62,13 @@ describe('orderActions', () => {
     expect(canCreateOrders(adminUser)).toBe(true)
     expect(canCreateOrders(designUser)).toBe(false)
     expect(canCreateOrders(null)).toBe(false)
+  })
+
+  it('allows only Admin and Sales users to delete orders', () => {
+    expect(canDeleteOrders(adminUser)).toBe(true)
+    expect(canDeleteOrders(salesUser)).toBe(true)
+    expect(canDeleteOrders(designUser)).toBe(false)
+    expect(canDeleteOrders(null)).toBe(false)
   })
 
   it('validates required fields when building a new order', () => {

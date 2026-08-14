@@ -40,6 +40,11 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.name;
     }
 
+    function canDeleteOrders() {
+      return isAdmin() ||
+        (isVerified() && currentUserDepartment() == 'Sales');
+    }
+
     match /users/{userId} {
       allow read: if (isVerified() && isOwnProfile(userId)) || isAdmin();
 
@@ -274,14 +279,16 @@ service cloud.firestore {
           )
         )
       );
-      allow delete: if isAdmin();
+      allow delete: if canDeleteOrders();
 
       match /activity/{activityId} {
         allow read: if isVerified();
         allow create: if isVerified() &&
           isValidActivity(request.resource.data, orderId) &&
           getAfter(/databases/$(database)/documents/orders/$(orderId)).data.lastActivityId == activityId;
-        allow update, delete: if false;
+        allow delete: if canDeleteOrders() &&
+          !existsAfter(/databases/$(database)/documents/orders/$(orderId));
+        allow update: if false;
       }
     }
 

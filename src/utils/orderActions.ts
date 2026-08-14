@@ -15,6 +15,10 @@ export function canCreateOrders(user: User | null) {
   return user?.dept === 'Admin'
 }
 
+export function canDeleteOrders(user: User | null) {
+  return user?.dept === 'Admin' || user?.dept === 'Sales'
+}
+
 export function validateNewOrderForm(form: NewOrderForm) {
   if (!form.client.trim()) {
     return 'Please enter the client or organisation name.'

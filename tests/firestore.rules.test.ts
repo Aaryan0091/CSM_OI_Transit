@@ -20,6 +20,7 @@ import { afterAll, afterEach, beforeAll, describe, test } from 'vitest'
 
 const PROJECT_ID = 'csm-order-tracker-rules-test'
 const SALES_USER_ID = 'sales-user'
+const DESIGN_USER_ID = 'design-user'
 const ADMIN_USER_ID = 'admin-user'
 const ORDER_ID = 'ORD-100'
 
@@ -139,6 +140,11 @@ describe('Firestore security rules', () => {
         name: 'Admin User',
         email: 'admin@example.com',
         dept: 'Sales',
+      })
+      await setDoc(doc(database, 'users', DESIGN_USER_ID), {
+        name: 'Design User',
+        email: 'design@example.com',
+        dept: 'Design',
       })
     })
   }
@@ -331,5 +337,46 @@ describe('Firestore security rules', () => {
     )
 
     await assertSucceeds(batch.commit())
+  })
+
+  test('allows Sales to atomically delete an order and its activity history', async () => {
+    await seedOrderAndProfiles()
+    const database = authenticatedDatabase(SALES_USER_ID)
+
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), 'orders', ORDER_ID, 'activity', 'existing-activity'),
+        activityRecord(SALES_USER_ID, 'Sales User', 'Sales', 'updated'),
+      )
+    })
+
+    const batch = writeBatch(database)
+    batch.delete(doc(database, 'orders', ORDER_ID, 'activity', 'existing-activity'))
+    batch.delete(doc(database, 'orders', ORDER_ID))
+
+    await assertSucceeds(batch.commit())
+  })
+
+  test('blocks Sales from deleting activity history without deleting its order', async () => {
+    await seedOrderAndProfiles()
+    const database = authenticatedDatabase(SALES_USER_ID)
+
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), 'orders', ORDER_ID, 'activity', 'existing-activity'),
+        activityRecord(SALES_USER_ID, 'Sales User', 'Sales', 'updated'),
+      )
+    })
+
+    await assertFails(
+      deleteDoc(doc(database, 'orders', ORDER_ID, 'activity', 'existing-activity')),
+    )
+  })
+
+  test('blocks other departments from deleting orders', async () => {
+    await seedOrderAndProfiles()
+    const database = authenticatedDatabase(DESIGN_USER_ID)
+
+    await assertFails(deleteDoc(doc(database, 'orders', ORDER_ID)))
   })
 })

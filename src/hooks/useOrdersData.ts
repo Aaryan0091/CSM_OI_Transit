@@ -1,8 +1,16 @@
 import { useEffect, useState } from 'react'
 import { isFirebaseConfigured } from '../lib/firebase'
-import { saveOrderToFirestore, subscribeToOrders } from '../services/orders'
+import {
+  deleteOrderFromFirestore,
+  saveOrderToFirestore,
+  subscribeToOrders,
+} from '../services/orders'
 import type { Company, Department, Order, Task, User } from '../types'
-import { applyOrderUpdates, canCreateOrders } from '../utils/orderActions'
+import {
+  applyOrderUpdates,
+  canCreateOrders,
+  canDeleteOrders,
+} from '../utils/orderActions'
 
 export function useOrdersData(currentUser: User | null) {
   const currentUserId = currentUser?.uid
@@ -142,6 +150,51 @@ export function useOrdersData(currentUser: User | null) {
     }
   }
 
+  const handleDelete = async (id: string): Promise<string | null> => {
+    if (!currentUser || !canDeleteOrders(currentUser)) {
+      const message = 'Only Admin and Sales users can delete orders.'
+      setSyncError(message)
+      return message
+    }
+
+    if (!orders.some((order) => order.id === id)) {
+      const message = 'This order is no longer available. Please refresh and try again.'
+      setSyncError(message)
+      return message
+    }
+
+    if (!isFirebaseConfigured) {
+      const message = 'Firebase is not configured, so this order cannot be deleted.'
+      setSyncError(message)
+      return message
+    }
+
+    try {
+      await deleteOrderFromFirestore(id)
+      setOrders((previous) => previous.filter((order) => order.id !== id))
+      setSelected(null)
+      setSyncError(null)
+      return null
+    } catch (error) {
+      console.error('Failed to delete Firestore order:', error)
+      const errorCode =
+        typeof error === 'object' && error !== null && 'code' in error
+          ? String(error.code)
+          : ''
+      const message =
+        error instanceof Error && error.message.includes('too much activity history')
+          ? error.message
+          : errorCode.includes('appCheck/') || errorCode.includes('app-check/')
+            ? 'App Check rejected this browser. Register its private localhost debug token and try again.'
+          : errorCode.includes('permission-denied')
+            ? 'Firestore rules denied this deletion. Publish the delete rules for project csm-oi-transit, then try again.'
+            : 'The order could not be deleted from Firestore. Please try again.'
+
+      setSyncError(message)
+      return message
+    }
+  }
+
   const filtered = visibleOrders.filter((order) => {
     const query = search.toLowerCase()
     const matchStatus = filter === 'All' || order.overallStatus === filter
@@ -176,6 +229,7 @@ export function useOrdersData(currentUser: User | null) {
     filter,
     filtered,
     handleAdd,
+    handleDelete,
     handleSave,
     isLoadingOrders,
     search,

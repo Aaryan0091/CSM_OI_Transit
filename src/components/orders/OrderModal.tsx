@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   DEPARTMENTS,
   STATUS_META,
@@ -10,17 +10,214 @@ import { StatusDot } from '../common/OrderVisuals'
 import { OrderActivityTimeline } from './OrderActivityTimeline'
 import type { Department, Order, Status, Task, Theme, User } from '../../types'
 import { normalizeTask } from '../../utils/orders'
-import { updateTaskStatusAndAdvance, validateOrderTasks } from '../../utils/orderActions'
+import {
+  canDeleteOrders,
+  updateTaskStatusAndAdvance,
+  validateOrderTasks,
+} from '../../utils/orderActions'
+
+function DeleteOrderConfirmation({
+  error,
+  isDeleting,
+  onCancel,
+  onConfirm,
+  order,
+  theme,
+}: {
+  error: string
+  isDeleting: boolean
+  onCancel: () => void
+  onConfirm: () => void
+  order: Order
+  theme: Theme
+}) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const cancelButtonRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    cancelButtonRef.current?.focus()
+  }, [])
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape' && !isDeleting) {
+      event.preventDefault()
+      onCancel()
+      return
+    }
+
+    if (event.key !== 'Tab') {
+      return
+    }
+
+    const buttons = Array.from(
+      dialogRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [],
+    )
+    const firstButton = buttons[0]
+    const lastButton = buttons.at(-1)
+
+    if (event.shiftKey && document.activeElement === firstButton) {
+      event.preventDefault()
+      lastButton?.focus()
+    } else if (!event.shiftKey && document.activeElement === lastButton) {
+      event.preventDefault()
+      firstButton?.focus()
+    }
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1100,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 20,
+        background: 'rgba(15, 23, 42, 0.62)',
+      }}
+      onClick={(event) => {
+        event.stopPropagation()
+
+        if (event.target === event.currentTarget && !isDeleting) {
+          onCancel()
+        }
+      }}
+    >
+      <div
+        ref={dialogRef}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="delete-order-title"
+        aria-describedby="delete-order-description"
+        onKeyDown={handleKeyDown}
+        style={{
+          width: '100%',
+          maxWidth: 440,
+          borderRadius: 16,
+          border: `1px solid ${theme.border}`,
+          background: theme.surface,
+          boxShadow: '0 24px 64px rgba(15, 23, 42, 0.35)',
+          padding: 24,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+          <div
+            aria-hidden="true"
+            style={{
+              flex: '0 0 auto',
+              width: 38,
+              height: 38,
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: '#FEE2E2',
+              color: '#B91C1C',
+              fontSize: 20,
+              fontWeight: 900,
+            }}
+          >
+            !
+          </div>
+          <div>
+            <h2
+              id="delete-order-title"
+              style={{ margin: 0, color: theme.text, fontSize: 19, lineHeight: 1.35 }}
+            >
+              Delete “{order.client}”?
+            </h2>
+            <p
+              id="delete-order-description"
+              style={{ margin: '8px 0 0', color: theme.textMuted, fontSize: 14, lineHeight: 1.55 }}
+            >
+              Order <strong>{order.id}</strong> and its complete activity history will be
+              permanently removed. This action cannot be undone.
+            </p>
+          </div>
+        </div>
+
+        {error && (
+          <div
+            role="alert"
+            style={{
+              marginTop: 18,
+              padding: '11px 13px',
+              borderRadius: 8,
+              border: '1px solid #FCA5A5',
+              background: theme.inputBg === '#0B1220' ? '#2B151B' : '#FFF1F2',
+              color: theme.inputBg === '#0B1220' ? '#FCA5A5' : '#B91C1C',
+              fontSize: 13,
+              fontWeight: 700,
+              lineHeight: 1.45,
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        <div
+          style={{
+            marginTop: 22,
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: 10,
+            flexWrap: 'wrap',
+          }}
+        >
+          <button
+            ref={cancelButtonRef}
+            type="button"
+            onClick={onCancel}
+            disabled={isDeleting}
+            style={{
+              minHeight: 44,
+              padding: '10px 18px',
+              borderRadius: 8,
+              border: `1px solid ${theme.border}`,
+              background: '#A8F5E9',
+              color: '#17324D',
+              cursor: isDeleting ? 'not-allowed' : 'pointer',
+              fontWeight: 700,
+            }}
+          >
+            Keep Order
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isDeleting}
+            style={{
+              minHeight: 44,
+              padding: '10px 18px',
+              borderRadius: 8,
+              border: '1px solid #B91C1C',
+              background: '#B91C1C',
+              color: '#FFFFFF',
+              cursor: isDeleting ? 'wait' : 'pointer',
+              fontWeight: 800,
+              opacity: isDeleting ? 0.75 : 1,
+            }}
+          >
+            {isDeleting ? 'Deleting...' : 'Delete Permanently'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function OrderModal({
   order,
   onClose,
+  onDelete,
   onSave,
   currentUser,
   theme,
 }: {
   order: Order
   onClose: () => void
+  onDelete: (id: string) => Promise<string | null>
   onSave: (id: string, updates: { tasks: Task[]; deadline: string }) => Promise<string | null>
   currentUser: User
   theme: Theme
@@ -42,6 +239,9 @@ export function OrderModal({
   const [isChangingDeadline, setIsChangingDeadline] = useState(false)
   const [activeTab, setActiveTab] = useState(initialActiveTab)
   const [saveError, setSaveError] = useState('')
+  const [deleteError, setDeleteError] = useState('')
+  const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
   const update = <K extends keyof Task>(index: number, field: K, value: Task[K]) => {
@@ -415,9 +615,32 @@ export function OrderModal({
           <span style={{ fontSize: 11, color: theme.textSoft }}>
             Logged in as <strong>{currentUser.name}</strong> ({currentUser.dept})
           </span>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {canDeleteOrders(currentUser) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteError('')
+                  setIsDeleteConfirmationOpen(true)
+                }}
+                disabled={isDeleting || isSaving}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: 8,
+                  border: '1px solid #DC2626',
+                  background: theme.surface,
+                  color: '#DC2626',
+                  cursor: isDeleting || isSaving ? 'wait' : 'pointer',
+                  fontWeight: 700,
+                  opacity: isDeleting || isSaving ? 0.65 : 1,
+                }}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Order'}
+              </button>
+            )}
             <button
               onClick={onClose}
+              disabled={isDeleting}
               style={{
                 padding: '10px 20px',
                 borderRadius: 8,
@@ -457,16 +680,16 @@ export function OrderModal({
                   setIsSaving(false)
                 }
               }}
-              disabled={isSaving}
+              disabled={isDeleting || isSaving}
               style={{
                 padding: '10px 24px',
                 borderRadius: 8,
                 border: 'none',
                 background: theme.primary,
                 color: theme.primaryText,
-                cursor: isSaving ? 'wait' : 'pointer',
+                cursor: isDeleting || isSaving ? 'wait' : 'pointer',
                 fontWeight: 700,
-                opacity: isSaving ? 0.75 : 1,
+                opacity: isDeleting || isSaving ? 0.75 : 1,
               }}
             >
               {isSaving ? 'Saving...' : 'Save Changes'}
@@ -474,6 +697,29 @@ export function OrderModal({
           </div>
         </div>
       </div>
+      {isDeleteConfirmationOpen && (
+        <DeleteOrderConfirmation
+          error={deleteError}
+          isDeleting={isDeleting}
+          order={order}
+          theme={theme}
+          onCancel={() => setIsDeleteConfirmationOpen(false)}
+          onConfirm={async () => {
+            setDeleteError('')
+            setIsDeleting(true)
+
+            try {
+              const errorMessage = await onDelete(order.id)
+
+              if (errorMessage) {
+                setDeleteError(errorMessage)
+              }
+            } finally {
+              setIsDeleting(false)
+            }
+          }}
+        />
+      )}
     </div>
   )
 }

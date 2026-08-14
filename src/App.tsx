@@ -47,6 +47,7 @@ export default function App() {
     filter,
     filtered,
     handleAdd,
+    handleDelete,
     handleSave,
     isLoadingOrders,
     search,
@@ -158,6 +159,7 @@ export default function App() {
           <OrderModal
             order={selected}
             onClose={() => setSelected(null)}
+            onDelete={handleDelete}
             onSave={handleSave}
             currentUser={currentUser}
             theme={theme}

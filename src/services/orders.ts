@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getDocs,
   limit,
   onSnapshot,
   orderBy,
@@ -13,6 +14,8 @@ import { appCheck, db } from '../lib/firebase'
 import type { Order, OrderActivity, User } from '../types'
 import { describeOrderChanges } from '../utils/orderActivity'
 import { normalizeOrder } from '../utils/orders'
+
+const MAX_ACTIVITY_RECORDS_PER_DELETE = 499
 
 export async function saveOrderToFirestore(
   order: Order,
@@ -43,6 +46,39 @@ export async function saveOrderToFirestore(
     summary: describeOrderChanges(previousOrder, order),
     createdAt: serverTimestamp(),
   })
+
+  await batch.commit()
+}
+
+export async function deleteOrderFromFirestore(orderId: string) {
+  if (!db) {
+    return
+  }
+
+  if (appCheck) {
+    await getToken(appCheck)
+  }
+
+  const orderReference = doc(db, 'orders', orderId)
+  const activitySnapshot = await getDocs(
+    query(
+      collection(orderReference, 'activity'),
+      limit(MAX_ACTIVITY_RECORDS_PER_DELETE + 1),
+    ),
+  )
+
+  if (activitySnapshot.size > MAX_ACTIVITY_RECORDS_PER_DELETE) {
+    throw new Error(
+      'This order has too much activity history for a safe browser deletion. Contact an administrator.',
+    )
+  }
+
+  const batch = writeBatch(db)
+
+  activitySnapshot.docs.forEach((activityDocument) => {
+    batch.delete(activityDocument.ref)
+  })
+  batch.delete(orderReference)
 
   await batch.commit()
 }
