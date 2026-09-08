@@ -45,6 +45,11 @@ service cloud.firestore {
         (isVerified() && currentUserDepartment() == 'Sales');
     }
 
+    function canCreateOrders() {
+      return isAdmin() ||
+        (isVerified() && currentUserDepartment() == 'Sales');
+    }
+
     match /users/{userId} {
       allow read: if (isVerified() && isOwnProfile(userId)) || isAdmin();
 
@@ -108,6 +113,9 @@ service cloud.firestore {
     function isValidOrder(data, orderId) {
       return data.keys().hasOnly([
           'id',
+          'sequenceNumber',
+          'orderNumber',
+          'orderNumberKey',
           'company',
           'client',
           'product',
@@ -155,15 +163,15 @@ service cloud.firestore {
         department == 'Dispatch' ? 5 : -1;
     }
 
-    function onlyDepartmentAndNextTaskChanged(before, after, department) {
+    function onlyDepartmentAndAdjacentTasksChanged(before, after, department) {
       let editableIndex = departmentIndex(department);
       return isDepartment(department) &&
-        (editableIndex == 0 || editableIndex + 1 == 0 || before.tasks[0] == after.tasks[0]) &&
-        (editableIndex == 1 || editableIndex + 1 == 1 || before.tasks[1] == after.tasks[1]) &&
-        (editableIndex == 2 || editableIndex + 1 == 2 || before.tasks[2] == after.tasks[2]) &&
-        (editableIndex == 3 || editableIndex + 1 == 3 || before.tasks[3] == after.tasks[3]) &&
-        (editableIndex == 4 || editableIndex + 1 == 4 || before.tasks[4] == after.tasks[4]) &&
-        (editableIndex == 5 || editableIndex + 1 == 5 || before.tasks[5] == after.tasks[5]);
+        (editableIndex - 1 == 0 || editableIndex == 0 || editableIndex + 1 == 0 || before.tasks[0] == after.tasks[0]) &&
+        (editableIndex - 1 == 1 || editableIndex == 1 || editableIndex + 1 == 1 || before.tasks[1] == after.tasks[1]) &&
+        (editableIndex - 1 == 2 || editableIndex == 2 || editableIndex + 1 == 2 || before.tasks[2] == after.tasks[2]) &&
+        (editableIndex - 1 == 3 || editableIndex == 3 || editableIndex + 1 == 3 || before.tasks[3] == after.tasks[3]) &&
+        (editableIndex - 1 == 4 || editableIndex == 4 || editableIndex + 1 == 4 || before.tasks[4] == after.tasks[4]) &&
+        (editableIndex - 1 == 5 || editableIndex == 5 || editableIndex + 1 == 5 || before.tasks[5] == after.tasks[5]);
     }
 
     function taskOnlyActivated(beforeTask, afterTask) {
@@ -211,6 +219,27 @@ service cloud.firestore {
         ));
     }
 
+    function taskOnlyReactivated(beforeTask, afterTask) {
+      return beforeTask.status == 'Completed' &&
+        afterTask.status == 'In Progress' &&
+        beforeTask.diff(afterTask).affectedKeys().hasOnly(['status']);
+    }
+
+    function previousTaskUnchangedOrReactivated(before, after, department) {
+      let editableIndex = departmentIndex(department);
+      return editableIndex == 0 ||
+        before.tasks[editableIndex - 1] == after.tasks[editableIndex - 1] ||
+        (
+          before.tasks[editableIndex].status in ['In Progress', 'On Hold'] &&
+          after.tasks[editableIndex].status == 'Pending' &&
+          after.tasks[editableIndex].remark.size() > 0 &&
+          taskOnlyReactivated(
+            before.tasks[editableIndex - 1],
+            after.tasks[editableIndex - 1]
+          )
+        );
+    }
+
     function isValidDepartmentUpdate(data, department) {
       return isDepartment(department) &&
         data.lastActivityId is string &&
@@ -224,6 +253,59 @@ service cloud.firestore {
     function hasNewMatchingActivity(data, orderId) {
       let activityPath = /databases/$(database)/documents/orders/$(orderId)/activity/$(data.lastActivityId);
       return !exists(activityPath) && existsAfter(activityPath);
+    }
+
+    function isValidOrderCounter(data) {
+      return data.keys().hasOnly(['lastNumber', 'updatedAt']) &&
+        data.lastNumber is int &&
+        data.lastNumber >= 1000 &&
+        data.updatedAt == request.time;
+    }
+
+    match /metadata/{metadataId} {
+      allow read: if metadataId == 'orderCounter' && canCreateOrders();
+      allow create: if metadataId == 'orderCounter' &&
+        canCreateOrders() &&
+        isValidOrderCounter(request.resource.data) &&
+        request.resource.data.lastNumber == 1000;
+      allow update: if metadataId == 'orderCounter' &&
+        canCreateOrders() &&
+        isValidOrderCounter(request.resource.data) &&
+        request.resource.data.lastNumber == resource.data.lastNumber + 1;
+      allow delete: if false;
+    }
+
+    function isValidOrderNumberReservation(data) {
+      return data.keys().hasOnly([
+          'orderId',
+          'orderNumber',
+          'reservedAt',
+          'reservedBy'
+        ]) &&
+        data.orderId is string &&
+        data.orderId.size() > 0 &&
+        data.orderNumber is string &&
+        data.orderNumber.size() > 0 &&
+        data.orderNumber.size() <= 100 &&
+        data.reservedAt == request.time &&
+        data.reservedBy == request.auth.uid;
+    }
+
+    function hasMatchingOrderNumberReservation(data, orderId) {
+      let reservation = getAfter(
+        /databases/$(database)/documents/orderNumberReservations/$(data.orderNumberKey)
+      ).data;
+      return reservation.orderId == orderId &&
+        reservation.orderNumber == data.orderNumber;
+    }
+
+    match /orderNumberReservations/{orderNumberKey} {
+      allow read: if canCreateOrders();
+      allow create: if canCreateOrders() &&
+        orderNumberKey.size() > 0 &&
+        orderNumberKey.size() <= 500 &&
+        isValidOrderNumberReservation(request.resource.data);
+      allow update, delete: if false;
     }
 
     function isValidActivity(data, orderId) {
@@ -251,7 +333,10 @@ service cloud.firestore {
 
     match /orders/{orderId} {
       allow read: if isVerified();
-      allow create: if isAdmin() &&
+      allow create: if canCreateOrders() &&
+        getAfter(/databases/$(database)/documents/metadata/orderCounter).data.lastNumber ==
+          request.resource.data.sequenceNumber &&
+        hasMatchingOrderNumberReservation(request.resource.data, orderId) &&
         isValidOrder(request.resource.data, orderId) &&
         hasNewMatchingActivity(request.resource.data, orderId);
       allow update: if hasNewMatchingActivity(request.resource.data, orderId) && (
@@ -267,12 +352,17 @@ service cloud.firestore {
             'overallStatus',
             'lastActivityId'
           ]) &&
-          onlyDepartmentAndNextTaskChanged(
+          onlyDepartmentAndAdjacentTasksChanged(
             resource.data,
             request.resource.data,
             currentUserDepartment()
           ) &&
           nextTaskUnchangedOrActivated(
+            resource.data,
+            request.resource.data,
+            currentUserDepartment()
+          ) &&
+          previousTaskUnchangedOrReactivated(
             resource.data,
             request.resource.data,
             currentUserDepartment()

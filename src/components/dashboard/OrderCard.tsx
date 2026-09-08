@@ -45,8 +45,13 @@ export function OrderCard({
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, color: theme.textSoft, fontWeight: 700, letterSpacing: '0.07em' }}>
-              {order.id}
+              {order.orderNumber ?? order.id}
             </span>
+            {order.orderNumber && (
+              <span style={{ fontSize: 10, color: theme.textSoft }}>
+                {order.id}
+              </span>
+            )}
             <Badge label={order.company} meta={{ bg: '#E6FFFB', color: '#0F766E' }} />
             <Badge label={order.priority} meta={priority} />
             <Badge label={order.overallStatus} meta={{ bg: statusMeta.bg, color: statusMeta.color }} />

@@ -31,6 +31,9 @@ export type Task = {
 
 export type Order = {
   id: string
+  sequenceNumber?: number
+  orderNumber?: string
+  orderNumberKey?: string
   company: Company
   client: string
   product: string

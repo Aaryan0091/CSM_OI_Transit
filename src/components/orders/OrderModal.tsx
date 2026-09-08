@@ -12,6 +12,7 @@ import type { Department, Order, Status, Task, Theme, User } from '../../types'
 import { normalizeTask } from '../../utils/orders'
 import {
   canDeleteOrders,
+  sendTaskBackToPreviousDepartment,
   updateTaskStatusAndAdvance,
   validateOrderTasks,
 } from '../../utils/orderActions'
@@ -131,7 +132,7 @@ function DeleteOrderConfirmation({
               id="delete-order-description"
               style={{ margin: '8px 0 0', color: theme.textMuted, fontSize: 14, lineHeight: 1.55 }}
             >
-              Order <strong>{order.id}</strong> and its complete activity history will be
+              Order <strong>{order.orderNumber ?? order.id}</strong> and its complete activity history will be
               permanently removed. This action cannot be undone.
             </p>
           </div>
@@ -239,6 +240,7 @@ export function OrderModal({
   const [isChangingDeadline, setIsChangingDeadline] = useState(false)
   const [activeTab, setActiveTab] = useState(initialActiveTab)
   const [saveError, setSaveError] = useState('')
+  const [workflowMessage, setWorkflowMessage] = useState('')
   const [deleteError, setDeleteError] = useState('')
   const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -246,6 +248,7 @@ export function OrderModal({
 
   const update = <K extends keyof Task>(index: number, field: K, value: Task[K]) => {
     setSaveError('')
+    setWorkflowMessage('')
     setTasks((previous) => {
       const next = [...previous]
       next[index] = { ...next[index], [field]: value }
@@ -255,6 +258,7 @@ export function OrderModal({
 
   const updateStatus = (index: number, status: Status) => {
     setSaveError('')
+    setWorkflowMessage('')
     setTasks((previous) => {
       const result = updateTaskStatusAndAdvance(previous, index, status)
 
@@ -274,6 +278,7 @@ export function OrderModal({
         .map((task, index) => ({ task, index }))
         .filter(({ task }) => task.dept === currentUser.dept)
   const activeTask = tasks[activeTab]
+  const previousTask = tasks[activeTab - 1]
   const editable = canEdit(activeTask.dept)
   const availableRemarkTargets = DEPARTMENTS.slice(activeTab + 1)
   const previousDeptRemarks = tasks
@@ -317,8 +322,13 @@ export function OrderModal({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <div style={{ fontSize: 11, color: theme.textSoft, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 4 }}>
-                {order.id}
+                {order.orderNumber ?? order.id}
               </div>
+              {order.orderNumber && (
+                <div style={{ fontSize: 10, color: theme.textSoft, marginBottom: 4 }}>
+                  System ID: {order.id}
+                </div>
+              )}
               <div style={{ fontSize: 11, color: theme.primary, fontWeight: 700, marginBottom: 6 }}>
                 {order.company}
               </div>
@@ -388,6 +398,21 @@ export function OrderModal({
                 }}
               >
                 {saveError}
+              </div>
+            )}
+            {workflowMessage && (
+              <div
+                role="status"
+                style={{
+                  background: '#D1FAE5',
+                  borderRadius: 8,
+                  padding: '10px 12px',
+                  fontSize: 12,
+                  color: '#065F46',
+                  fontWeight: 700,
+                }}
+              >
+                {workflowMessage}
               </div>
             )}
             {!editable && (
@@ -535,6 +560,57 @@ export function OrderModal({
                 style={{ ...themedInputStyle(theme), resize: 'vertical', ...(editable ? {} : themedDisabledStyle(theme)) }}
               />
             </Field>
+
+            {editable &&
+              previousTask &&
+              previousTask.status === 'Completed' &&
+              (activeTask.status === 'In Progress' || activeTask.status === 'On Hold') && (
+                <div
+                  style={{
+                    padding: 14,
+                    borderRadius: 10,
+                    border: '1px solid #a8f5e9',
+                    background: theme.surfaceAlt,
+                  }}
+                >
+                  <div style={{ fontSize: 12, color: theme.textMuted, lineHeight: 1.5 }}>
+                    If this order needs correction, add a progress remark above and return it one
+                    step to <strong>{previousTask.dept}</strong>.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const result = sendTaskBackToPreviousDepartment(tasks, activeTab)
+
+                      if (result.error) {
+                        setWorkflowMessage('')
+                        setSaveError(result.error)
+                        return
+                      }
+
+                      setSaveError('')
+                      setTasks(result.tasks)
+                      setWorkflowMessage(
+                        `Ready to send back to ${previousTask.dept}. Click Save Changes to confirm.`,
+                      )
+                    }}
+                    disabled={isDeleting || isSaving}
+                    style={{
+                      marginTop: 10,
+                      padding: '9px 14px',
+                      borderRadius: 8,
+                      border: '1px solid #0F766E',
+                      background: '#a8f5e9',
+                      color: '#134E4A',
+                      cursor: isDeleting || isSaving ? 'wait' : 'pointer',
+                      fontWeight: 800,
+                      fontSize: 12,
+                    }}
+                  >
+                    Send Back to {previousTask.dept}
+                  </button>
+                </div>
+              )}
 
             <Field label="Remark For Next Departments" theme={theme}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

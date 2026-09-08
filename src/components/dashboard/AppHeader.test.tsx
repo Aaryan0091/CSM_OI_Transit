@@ -1,50 +1,51 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { THEMES } from '../../data/constants'
 import type { User } from '../../types'
 import { AppHeader } from './AppHeader'
 
-const theme = THEMES.light
-
-function renderHeader(user: User, overrides?: Partial<Parameters<typeof AppHeader>[0]>) {
-  const props = {
-    currentUser: user,
-    theme,
-    themeMode: 'light' as const,
-    onToggleTheme: vi.fn(),
-    onOpenNewOrder: vi.fn(),
-    onSignOut: vi.fn(),
-    ...overrides,
+function user(dept: User['dept']): User {
+  return {
+    uid: `${dept.toLowerCase()}-user`,
+    email: `${dept.toLowerCase()}@company.com`,
+    emailVerified: true,
+    name: `${dept} User`,
+    dept,
   }
-
-  render(<AppHeader {...props} />)
-  return props
 }
 
-describe('AppHeader admin gating', () => {
-  it('shows the new order action only for admins', () => {
-    renderHeader({
-      uid: '1',
-      email: 'admin@company.com',
-      emailVerified: true,
-      name: 'Admin',
-      dept: 'Admin',
-    })
+function renderHeader(currentUser: User, onOpenNewOrder = vi.fn()) {
+  render(
+    <AppHeader
+      currentUser={currentUser}
+      onOpenNewOrder={onOpenNewOrder}
+      onSignOut={vi.fn()}
+      onToggleTheme={vi.fn()}
+      theme={THEMES.light}
+      themeMode="light"
+    />,
+  )
 
-    expect(screen.queryByText('+ New Order')).not.toBeNull()
-    expect(screen.queryByText('Admin access: contact owner')).toBeNull()
-  })
+  return onOpenNewOrder
+}
 
-  it('tells non-admin users to contact the owner for admin access', () => {
-    renderHeader({
-      uid: '2',
-      email: 'design@company.com',
-      emailVerified: true,
-      name: 'Design',
-      dept: 'Design',
-    })
+describe('AppHeader order creation access', () => {
+  it.each(['Admin', 'Sales'] as const)(
+    'shows the New Order button to %s users',
+    (department) => {
+      const onOpenNewOrder = renderHeader(user(department))
 
-    expect(screen.queryByText('+ New Order')).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: '+ New Order' }))
+
+      expect(onOpenNewOrder).toHaveBeenCalledOnce()
+      expect(screen.queryByText('Admin access: contact owner')).toBeNull()
+    },
+  )
+
+  it('hides the New Order button from other departments', () => {
+    renderHeader(user('Design'))
+
+    expect(screen.queryByRole('button', { name: '+ New Order' })).toBeNull()
     expect(screen.queryByText('Admin access: contact owner')).not.toBeNull()
   })
 })

@@ -5,6 +5,9 @@ import {
   buildNewOrder,
   canCreateOrders,
   canDeleteOrders,
+  createOrderId,
+  createOrderNumberKey,
+  sendTaskBackToPreviousDepartment,
   updateTaskStatusAndAdvance,
   validateOrderTasks,
 } from './orderActions'
@@ -33,6 +36,14 @@ const salesUser: User = {
   dept: 'Sales',
 }
 
+const procurementUser: User = {
+  uid: 'procurement-1',
+  email: 'procurement@company.com',
+  emailVerified: true,
+  name: 'Procurement User',
+  dept: 'Procurement',
+}
+
 const baseOrder: Order = {
   id: 'ORD-001',
   company: 'CSM',
@@ -58,8 +69,9 @@ function cloneOrder(order: Order) {
 }
 
 describe('orderActions', () => {
-  it('allows only admins to create orders', () => {
+  it('allows only Admin and Sales users to create orders', () => {
     expect(canCreateOrders(adminUser)).toBe(true)
+    expect(canCreateOrders(salesUser)).toBe(true)
     expect(canCreateOrders(designUser)).toBe(false)
     expect(canCreateOrders(null)).toBe(false)
   })
@@ -73,6 +85,7 @@ describe('orderActions', () => {
 
   it('validates required fields when building a new order', () => {
     const result = buildNewOrder({
+      orderNumber: 'WO-100',
       company: 'CSM',
       client: '  ',
       product: '',
@@ -88,6 +101,7 @@ describe('orderActions', () => {
   it('builds a trimmed order payload for valid input', () => {
     const result = buildNewOrder(
       {
+        orderNumber: '  CLIENT-WO/42  ',
         company: 'Oriental',
         client: '  Test Client  ',
         product: '  FRP Cable Tray ',
@@ -95,11 +109,14 @@ describe('orderActions', () => {
         deadline: '2026-08-21',
         priority: 'High',
       },
-      { createdAt: '2026-07-11', randomValue: 0 },
+      { createdAt: '2026-07-11', sequenceNumber: 1000 },
     )
 
     expect(result.error).toBeNull()
-    expect(result.order?.id).toBe('ORD-100')
+    expect(result.order?.id).toBe('ORD-1000')
+    expect(result.order?.sequenceNumber).toBe(1000)
+    expect(result.order?.orderNumber).toBe('CLIENT-WO/42')
+    expect(result.order?.orderNumberKey).toBe('CLIENT-WO%2F42')
     expect(result.order?.client).toBe('Test Client')
     expect(result.order?.product).toBe('FRP Cable Tray')
     expect(result.order?.tasks).toHaveLength(6)
@@ -113,9 +130,22 @@ describe('orderActions', () => {
     ])
   })
 
+  it('formats permanent sequential order IDs without a three-digit limit', () => {
+    expect(createOrderId(1)).toBe('ORD-001')
+    expect(createOrderId(999)).toBe('ORD-999')
+    expect(createOrderId(1000)).toBe('ORD-1000')
+    expect(createOrderId(12543)).toBe('ORD-12543')
+  })
+
+  it('reserves entered order numbers case-insensitively', () => {
+    expect(createOrderNumberKey('Client-WO/42')).toBe('CLIENT-WO%2F42')
+    expect(createOrderNumberKey(' client-wo/42 ')).toBe('CLIENT-WO%2F42')
+  })
+
   it('activates the next department when the current department finishes', () => {
     const order = buildNewOrder(
       {
+        orderNumber: 'WO-200',
         company: 'CSM',
         client: 'Test Client',
         product: 'Test Product',
@@ -139,6 +169,7 @@ describe('orderActions', () => {
   it('advances through every department and dispatches the completed order', () => {
     const order = buildNewOrder(
       {
+        orderNumber: 'WO-201',
         company: 'CSM',
         client: 'Lifecycle Client',
         product: 'Lifecycle Product',
@@ -174,6 +205,36 @@ describe('orderActions', () => {
         adminUser,
       ).overallStatus,
     ).toBe('Completed')
+  })
+
+  it('sends an active order back exactly one department', () => {
+    const order = cloneOrder(baseOrder)
+    const result = sendTaskBackToPreviousDepartment(order.tasks, 2)
+
+    expect(result.error).toBeNull()
+    expect(result.tasks[1].status).toBe('In Progress')
+    expect(result.tasks[2].status).toBe('Pending')
+
+    const saved = applyOrderUpdates(
+      order,
+      { deadline: order.deadline, tasks: result.tasks },
+      procurementUser,
+    )
+    expect(saved.tasks[1].status).toBe('In Progress')
+    expect(saved.tasks[2].status).toBe('Pending')
+  })
+
+  it('requires a progress remark before sending an order back', () => {
+    const order = cloneOrder(baseOrder)
+    order.tasks[2].remark = ' '
+
+    const result = sendTaskBackToPreviousDepartment(order.tasks, 2)
+
+    expect(result.error).toBe(
+      'Add a Procurement progress remark explaining why the order is being sent back.',
+    )
+    expect(result.tasks[1].status).toBe('Completed')
+    expect(result.tasks[2].status).toBe('In Progress')
   })
 
   it('requires a hold reason when a task is on hold', () => {

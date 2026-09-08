@@ -10,10 +10,11 @@ export function AddOrderModal({
   theme,
 }: {
   onClose: () => void
-  onAdd: (order: Order) => void
+  onAdd: (order: Order) => Promise<string | null>
   theme: Theme
 }) {
   const [form, setForm] = useState<{
+    orderNumber: string
     company: Company
     client: string
     product: string
@@ -21,6 +22,7 @@ export function AddOrderModal({
     deadline: string
     priority: Priority
   }>({
+    orderNumber: '',
     company: 'CSM',
     client: '',
     product: '',
@@ -29,13 +31,14 @@ export function AddOrderModal({
     priority: 'Medium',
   })
   const [formError, setFormError] = useState('')
+  const [isAdding, setIsAdding] = useState(false)
 
   const updateField = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => {
     setFormError('')
     setForm((previous) => ({ ...previous, [key]: value }))
   }
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const nextOrder = buildNewOrder(form)
 
     if (!nextOrder.order || nextOrder.error) {
@@ -43,7 +46,17 @@ export function AddOrderModal({
       return
     }
 
-    onAdd(nextOrder.order as Order)
+    setIsAdding(true)
+
+    try {
+      const errorMessage = await onAdd(nextOrder.order as Order)
+
+      if (errorMessage) {
+        setFormError(errorMessage)
+      }
+    } finally {
+      setIsAdding(false)
+    }
   }
 
   return (
@@ -74,7 +87,7 @@ export function AddOrderModal({
         <div style={{ padding: '20px 24px 16px', borderBottom: `1px solid ${theme.border}` }}>
           <div style={{ fontSize: 17, fontWeight: 800, color: theme.text }}>New Order</div>
           <div style={{ fontSize: 12, color: theme.textSoft, marginTop: 2 }}>
-            Fill details to add this order to the tracker
+            Enter the business order number; a permanent system ID is assigned automatically
           </div>
         </div>
         <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -93,8 +106,19 @@ export function AddOrderModal({
               {formError}
             </div>
           )}
-          <Field label="Company" theme={theme}>
+          <Field label="Order Number" htmlFor="new-order-number" theme={theme}>
+            <input
+              id="new-order-number"
+              value={form.orderNumber}
+              onChange={(event) => updateField('orderNumber', event.target.value)}
+              placeholder="Enter the order number"
+              autoFocus
+              style={themedInputStyle(theme)}
+            />
+          </Field>
+          <Field label="Company" htmlFor="new-order-company" theme={theme}>
             <select
+              id="new-order-company"
               value={form.company}
               onChange={(event) => updateField('company', event.target.value as Company)}
               style={themedInputStyle(theme)}
@@ -104,24 +128,27 @@ export function AddOrderModal({
               ))}
             </select>
           </Field>
-          <Field label="Client / Organisation" theme={theme}>
+          <Field label="Client / Organisation" htmlFor="new-order-client" theme={theme}>
             <input
+              id="new-order-client"
               value={form.client}
               onChange={(event) => updateField('client', event.target.value)}
               placeholder="Enter client or organisation name"
               style={themedInputStyle(theme)}
             />
           </Field>
-          <Field label="Product" theme={theme}>
+          <Field label="Product" htmlFor="new-order-product" theme={theme}>
             <input
+              id="new-order-product"
               value={form.product}
               onChange={(event) => updateField('product', event.target.value)}
               placeholder="e.g. FRP Cable Trays"
               style={themedInputStyle(theme)}
             />
           </Field>
-          <Field label="Description" theme={theme}>
+          <Field label="Description" htmlFor="new-order-description" theme={theme}>
             <textarea
+              id="new-order-description"
               value={form.description}
               onChange={(event) => updateField('description', event.target.value)}
               placeholder="e.g. x 200 mtrs or extra order details"
@@ -136,16 +163,18 @@ export function AddOrderModal({
               gap: 12,
             }}
           >
-            <Field label="Deadline" theme={theme}>
+            <Field label="Deadline" htmlFor="new-order-deadline" theme={theme}>
               <input
+                id="new-order-deadline"
                 type="date"
                 value={form.deadline}
                 onChange={(event) => updateField('deadline', event.target.value)}
                 style={themedInputStyle(theme)}
               />
             </Field>
-            <Field label="Priority" theme={theme}>
+            <Field label="Priority" htmlFor="new-order-priority" theme={theme}>
               <select
+                id="new-order-priority"
                 value={form.priority}
                 onChange={(event) => updateField('priority', event.target.value as Priority)}
                 style={themedInputStyle(theme)}
@@ -168,12 +197,13 @@ export function AddOrderModal({
         >
           <button
             onClick={onClose}
+            disabled={isAdding}
             style={{
               padding: '10px 20px',
               borderRadius: 8,
               border: `1px solid ${theme.border}`,
               background: theme.surface,
-              cursor: 'pointer',
+              cursor: isAdding ? 'not-allowed' : 'pointer',
               fontWeight: 600,
               color: theme.textMuted,
             }}
@@ -182,17 +212,19 @@ export function AddOrderModal({
           </button>
           <button
             onClick={handleAdd}
+            disabled={isAdding}
             style={{
               padding: '10px 24px',
               borderRadius: 8,
               border: 'none',
               background: theme.primary,
               color: theme.primaryText,
-              cursor: 'pointer',
+              cursor: isAdding ? 'wait' : 'pointer',
               fontWeight: 700,
+              opacity: isAdding ? 0.75 : 1,
             }}
           >
-            Add Order
+            {isAdding ? 'Assigning Number...' : 'Add Order'}
           </button>
         </div>
       </div>

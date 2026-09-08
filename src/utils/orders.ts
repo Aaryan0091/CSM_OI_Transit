@@ -54,6 +54,9 @@ export function normalizeTask(
 export function normalizeOrder(order: Order): Order {
   return {
     id: order.id,
+    ...(typeof order.sequenceNumber === 'number' ? { sequenceNumber: order.sequenceNumber } : {}),
+    ...(order.orderNumber ? { orderNumber: order.orderNumber } : {}),
+    ...(order.orderNumberKey ? { orderNumberKey: order.orderNumberKey } : {}),
     company: order.company,
     client: order.client,
     product: order.product,

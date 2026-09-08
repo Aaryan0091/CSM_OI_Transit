@@ -1,6 +1,7 @@
 import { AUTH_COPY } from '../../data/authCopy'
 import { EyeClosedIcon, EyeIcon } from '../common/Icons'
 import type { Theme, ThemeMode, User } from '../../types'
+import { canCreateOrders } from '../../utils/orderActions'
 
 export function AppHeader({
   currentUser,
@@ -73,7 +74,7 @@ export function AppHeader({
           <div style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>{currentUser.name}</div>
           <div style={{ color: theme.textSoft, fontSize: 10 }}>{currentUser.dept}</div>
         </div>
-        {currentUser.dept === 'Admin' && (
+        {canCreateOrders(currentUser) && (
           <button
             onClick={onOpenNewOrder}
             style={{
@@ -90,7 +91,7 @@ export function AppHeader({
             + New Order
           </button>
         )}
-        {currentUser.dept !== 'Admin' && (
+        {!canCreateOrders(currentUser) && (
           <div
             title={AUTH_COPY.adminAccessHelp}
             style={{

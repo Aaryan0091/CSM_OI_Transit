@@ -6,6 +6,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   writeBatch,
 } from 'firebase/firestore'
@@ -13,9 +14,89 @@ import { getToken } from 'firebase/app-check'
 import { appCheck, db } from '../lib/firebase'
 import type { Order, OrderActivity, User } from '../types'
 import { describeOrderChanges } from '../utils/orderActivity'
+import { createOrderId, createOrderNumberKey } from '../utils/orderActions'
 import { normalizeOrder } from '../utils/orders'
 
 const MAX_ACTIVITY_RECORDS_PER_DELETE = 499
+const INITIAL_ORDER_SEQUENCE = 999
+
+export async function createOrderInFirestore(orderDraft: Order, user: User) {
+  if (!db) {
+    throw new Error('Firebase is not configured.')
+  }
+
+  const firestore = db
+
+  if (appCheck) {
+    await getToken(appCheck)
+  }
+
+  const counterReference = doc(firestore, 'metadata', 'orderCounter')
+  const orderNumber = orderDraft.orderNumber?.trim()
+
+  if (!orderNumber) {
+    throw new Error('An order number is required.')
+  }
+
+  const orderNumberKey = createOrderNumberKey(orderNumber)
+  const reservationReference = doc(
+    firestore,
+    'orderNumberReservations',
+    orderNumberKey,
+  )
+
+  return runTransaction(firestore, async (transaction) => {
+    const counterSnapshot = await transaction.get(counterReference)
+    const reservationSnapshot = await transaction.get(reservationReference)
+
+    if (reservationSnapshot.exists()) {
+      throw new Error('ORDER_NUMBER_ALREADY_EXISTS')
+    }
+
+    const storedLastNumber = counterSnapshot.exists()
+      ? counterSnapshot.data().lastNumber
+      : INITIAL_ORDER_SEQUENCE
+    const lastNumber =
+      Number.isSafeInteger(storedLastNumber) && storedLastNumber >= INITIAL_ORDER_SEQUENCE
+        ? storedLastNumber
+        : INITIAL_ORDER_SEQUENCE
+    const sequenceNumber = lastNumber + 1
+    const order: Order = {
+      ...orderDraft,
+      id: createOrderId(sequenceNumber),
+      sequenceNumber,
+      orderNumber: orderDraft.orderNumber?.trim(),
+      orderNumberKey,
+    }
+    const orderReference = doc(firestore, 'orders', order.id)
+    const activityReference = doc(collection(orderReference, 'activity'))
+
+    transaction.set(counterReference, {
+      lastNumber: sequenceNumber,
+      updatedAt: serverTimestamp(),
+    })
+    transaction.set(reservationReference, {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      reservedAt: serverTimestamp(),
+      reservedBy: user.uid,
+    })
+    transaction.set(orderReference, {
+      ...order,
+      lastActivityId: activityReference.id,
+    })
+    transaction.set(activityReference, {
+      actorUid: user.uid,
+      actorName: user.name,
+      actorDept: user.dept,
+      action: 'created',
+      summary: describeOrderChanges(null, order),
+      createdAt: serverTimestamp(),
+    })
+
+    return order
+  })
+}
 
 export async function saveOrderToFirestore(
   order: Order,

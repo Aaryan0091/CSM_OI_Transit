@@ -16,13 +16,15 @@ import {
   writeBatch,
   type Firestore,
 } from 'firebase/firestore'
-import { afterAll, afterEach, beforeAll, describe, test } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 
 const PROJECT_ID = 'csm-order-tracker-rules-test'
 const SALES_USER_ID = 'sales-user'
 const DESIGN_USER_ID = 'design-user'
 const ADMIN_USER_ID = 'admin-user'
 const ORDER_ID = 'ORD-100'
+const FIRST_SEQUENTIAL_ORDER_ID = 'ORD-1000'
+const SECOND_SEQUENTIAL_ORDER_ID = 'ORD-1001'
 
 type Task = {
   dept: string
@@ -36,9 +38,21 @@ type Task = {
 
 const departments = ['Sales', 'Design', 'Procurement', 'Production', 'QC', 'Dispatch']
 
-function buildOrder(lastActivityId = 'seed-activity') {
+function buildOrder(
+  lastActivityId = 'seed-activity',
+  id = ORDER_ID,
+  sequenceNumber?: number,
+) {
+  const orderNumber = sequenceNumber ? `PO-${sequenceNumber}` : undefined
   return {
-    id: ORDER_ID,
+    id,
+    ...(sequenceNumber && orderNumber
+      ? {
+          sequenceNumber,
+          orderNumber,
+          orderNumberKey: orderNumber,
+        }
+      : {}),
     company: 'CSM',
     client: 'Test Client',
     product: 'Test Product',
@@ -57,6 +71,19 @@ function buildOrder(lastActivityId = 'seed-activity') {
     })),
     createdAt: '2026-08-09',
     lastActivityId,
+  }
+}
+
+function orderNumberReservation(
+  orderId: string,
+  orderNumber: string,
+  reservedBy = ADMIN_USER_ID,
+) {
+  return {
+    orderId,
+    orderNumber,
+    reservedAt: serverTimestamp(),
+    reservedBy,
   }
 }
 
@@ -87,14 +114,15 @@ async function commitOrderUpdate(
   changes: Record<string, unknown>,
   activityId: string,
   actor: { uid: string; name: string; dept: string },
+  orderId = ORDER_ID,
 ) {
   const batch = writeBatch(database)
-  batch.update(doc(database, 'orders', ORDER_ID), {
+  batch.update(doc(database, 'orders', orderId), {
     ...changes,
     lastActivityId: activityId,
   })
   batch.set(
-    doc(database, 'orders', ORDER_ID, 'activity', activityId),
+    doc(database, 'orders', orderId, 'activity', activityId),
     activityRecord(actor.uid, actor.name, actor.dept, 'updated'),
   )
   await batch.commit()
@@ -247,6 +275,93 @@ describe('Firestore security rules', () => {
     )
   })
 
+  test('allows an active department to send an order back one step', async () => {
+    await seedOrderAndProfiles()
+    const database = authenticatedDatabase(DESIGN_USER_ID)
+    const order = buildOrder()
+    order.tasks = order.tasks.map((task, index) => ({
+      ...task,
+      status: index === 0 ? 'Completed' : index === 1 ? 'In Progress' : 'Pending',
+    }))
+
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'orders', ORDER_ID), order)
+    })
+
+    const returnedTasks = updateTask(
+      updateTask(order.tasks, 0, { status: 'In Progress' }),
+      1,
+      { status: 'Pending', remark: 'Design needs corrected sales information' },
+    )
+
+    await assertSucceeds(
+      commitOrderUpdate(
+        database,
+        { tasks: returnedTasks },
+        'design-sent-back',
+        { uid: DESIGN_USER_ID, name: 'Design User', dept: 'Design' },
+      ),
+    )
+  })
+
+  test('blocks a department from changing previous-department details while sending back', async () => {
+    await seedOrderAndProfiles()
+    const database = authenticatedDatabase(DESIGN_USER_ID)
+    const order = buildOrder()
+    order.tasks = order.tasks.map((task, index) => ({
+      ...task,
+      status: index === 0 ? 'Completed' : index === 1 ? 'In Progress' : 'Pending',
+    }))
+
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'orders', ORDER_ID), order)
+    })
+
+    const tamperedTasks = updateTask(
+      updateTask(order.tasks, 0, { status: 'In Progress', assignee: 'Changed by Design' }),
+      1,
+      { status: 'Pending', remark: 'Attempted unauthorized rollback' },
+    )
+
+    await assertFails(
+      commitOrderUpdate(
+        database,
+        { tasks: tamperedTasks },
+        'design-tampered-send-back',
+        { uid: DESIGN_USER_ID, name: 'Design User', dept: 'Design' },
+      ),
+    )
+  })
+
+  test('blocks sending an order back without a progress remark', async () => {
+    await seedOrderAndProfiles()
+    const database = authenticatedDatabase(DESIGN_USER_ID)
+    const order = buildOrder()
+    order.tasks = order.tasks.map((task, index) => ({
+      ...task,
+      status: index === 0 ? 'Completed' : index === 1 ? 'In Progress' : 'Pending',
+    }))
+
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'orders', ORDER_ID), order)
+    })
+
+    const returnedWithoutRemark = updateTask(
+      updateTask(order.tasks, 0, { status: 'In Progress' }),
+      1,
+      { status: 'Pending', remark: '' },
+    )
+
+    await assertFails(
+      commitOrderUpdate(
+        database,
+        { tasks: returnedWithoutRemark },
+        'design-send-back-without-remark',
+        { uid: DESIGN_USER_ID, name: 'Design User', dept: 'Design' },
+      ),
+    )
+  })
+
   test('blocks a department user from updating another department task', async () => {
     await seedOrderAndProfiles()
     const database = authenticatedDatabase(SALES_USER_ID)
@@ -286,17 +401,24 @@ describe('Firestore security rules', () => {
   test('allows a verified admin to create, update, and delete a valid order', async () => {
     await seedOrderAndProfiles()
     const database = authenticatedDatabase(ADMIN_USER_ID, { admin: true })
-    const orderReference = doc(database, 'orders', ORDER_ID)
+    const orderReference = doc(database, 'orders', FIRST_SEQUENTIAL_ORDER_ID)
     const createActivityId = 'admin-create'
     const createBatch = writeBatch(database)
 
-    await testEnvironment.withSecurityRulesDisabled(async (context) => {
-      await deleteDoc(doc(context.firestore(), 'orders', ORDER_ID))
+    createBatch.set(doc(database, 'metadata', 'orderCounter'), {
+      lastNumber: 1000,
+      updatedAt: serverTimestamp(),
     })
-
-    createBatch.set(orderReference, buildOrder(createActivityId))
     createBatch.set(
-      doc(database, 'orders', ORDER_ID, 'activity', createActivityId),
+      doc(database, 'orderNumberReservations', 'PO-1000'),
+      orderNumberReservation(FIRST_SEQUENTIAL_ORDER_ID, 'PO-1000'),
+    )
+    createBatch.set(
+      orderReference,
+      buildOrder(createActivityId, FIRST_SEQUENTIAL_ORDER_ID, 1000),
+    )
+    createBatch.set(
+      doc(database, 'orders', FIRST_SEQUENTIAL_ORDER_ID, 'activity', createActivityId),
       activityRecord(ADMIN_USER_ID, 'Admin User', 'Admin', 'created'),
     )
 
@@ -307,9 +429,125 @@ describe('Firestore security rules', () => {
         { deadline: '2026-10-01' },
         'admin-update',
         { uid: ADMIN_USER_ID, name: 'Admin User', dept: 'Admin' },
+        FIRST_SEQUENTIAL_ORDER_ID,
       ),
     )
     await assertSucceeds(deleteDoc(orderReference))
+  })
+
+  test('increments the permanent counter and keeps it after an order is deleted', async () => {
+    await seedOrderAndProfiles()
+    const database = authenticatedDatabase(ADMIN_USER_ID, { admin: true })
+    const firstActivityId = 'first-create'
+    const firstBatch = writeBatch(database)
+
+    firstBatch.set(doc(database, 'metadata', 'orderCounter'), {
+      lastNumber: 1000,
+      updatedAt: serverTimestamp(),
+    })
+    firstBatch.set(
+      doc(database, 'orderNumberReservations', 'PO-1000'),
+      orderNumberReservation(FIRST_SEQUENTIAL_ORDER_ID, 'PO-1000'),
+    )
+    firstBatch.set(
+      doc(database, 'orders', FIRST_SEQUENTIAL_ORDER_ID),
+      buildOrder(firstActivityId, FIRST_SEQUENTIAL_ORDER_ID, 1000),
+    )
+    firstBatch.set(
+      doc(database, 'orders', FIRST_SEQUENTIAL_ORDER_ID, 'activity', firstActivityId),
+      activityRecord(ADMIN_USER_ID, 'Admin User', 'Admin', 'created'),
+    )
+    await assertSucceeds(firstBatch.commit())
+
+    const secondActivityId = 'second-create'
+    const secondBatch = writeBatch(database)
+    secondBatch.update(doc(database, 'metadata', 'orderCounter'), {
+      lastNumber: 1001,
+      updatedAt: serverTimestamp(),
+    })
+    secondBatch.set(
+      doc(database, 'orderNumberReservations', 'PO-1001'),
+      orderNumberReservation(SECOND_SEQUENTIAL_ORDER_ID, 'PO-1001'),
+    )
+    secondBatch.set(
+      doc(database, 'orders', SECOND_SEQUENTIAL_ORDER_ID),
+      buildOrder(secondActivityId, SECOND_SEQUENTIAL_ORDER_ID, 1001),
+    )
+    secondBatch.set(
+      doc(database, 'orders', SECOND_SEQUENTIAL_ORDER_ID, 'activity', secondActivityId),
+      activityRecord(ADMIN_USER_ID, 'Admin User', 'Admin', 'created'),
+    )
+    await assertSucceeds(secondBatch.commit())
+    await assertSucceeds(deleteDoc(doc(database, 'orders', SECOND_SEQUENTIAL_ORDER_ID)))
+
+    const counterSnapshot = await getDoc(doc(database, 'metadata', 'orderCounter'))
+    expect(counterSnapshot.data()?.lastNumber).toBe(1001)
+    await assertFails(
+      setDoc(
+        doc(database, 'orderNumberReservations', 'PO-1001'),
+        orderNumberReservation('ORD-9999', 'PO-1001'),
+      ),
+    )
+  })
+
+  test('allows Sales to create a valid permanently numbered order', async () => {
+    await seedOrderAndProfiles()
+    const database = authenticatedDatabase(SALES_USER_ID)
+    const activityId = 'sales-create'
+    const batch = writeBatch(database)
+
+    batch.set(doc(database, 'metadata', 'orderCounter'), {
+      lastNumber: 1000,
+      updatedAt: serverTimestamp(),
+    })
+    batch.set(
+      doc(database, 'orderNumberReservations', 'PO-1000'),
+      orderNumberReservation(FIRST_SEQUENTIAL_ORDER_ID, 'PO-1000', SALES_USER_ID),
+    )
+    batch.set(
+      doc(database, 'orders', FIRST_SEQUENTIAL_ORDER_ID),
+      buildOrder(activityId, FIRST_SEQUENTIAL_ORDER_ID, 1000),
+    )
+    batch.set(
+      doc(database, 'orders', FIRST_SEQUENTIAL_ORDER_ID, 'activity', activityId),
+      activityRecord(SALES_USER_ID, 'Sales User', 'Sales', 'created'),
+    )
+
+    await assertSucceeds(batch.commit())
+  })
+
+  test('blocks other departments from changing the order counter', async () => {
+    await seedOrderAndProfiles()
+    const database = authenticatedDatabase(DESIGN_USER_ID)
+
+    await assertFails(
+      setDoc(doc(database, 'metadata', 'orderCounter'), {
+        lastNumber: 1000,
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  test('blocks new orders that do not reserve a permanent number', async () => {
+    await seedOrderAndProfiles()
+    const database = authenticatedDatabase(ADMIN_USER_ID, { admin: true })
+    const activityId = 'missing-counter'
+    const batch = writeBatch(database)
+
+    batch.set(
+      doc(database, 'orderNumberReservations', 'PO-1000'),
+      orderNumberReservation(FIRST_SEQUENTIAL_ORDER_ID, 'PO-1000'),
+    )
+    batch.set(
+      doc(database, 'orders', FIRST_SEQUENTIAL_ORDER_ID),
+      buildOrder(activityId, FIRST_SEQUENTIAL_ORDER_ID, 1000),
+    )
+    batch.set(
+      doc(database, 'orders', FIRST_SEQUENTIAL_ORDER_ID, 'activity', activityId),
+      activityRecord(ADMIN_USER_ID, 'Admin User', 'Admin', 'created'),
+    )
+
+    await assertFails(batch.commit())
   })
 
   test('allows an admin to complete Design using the client full-document batch', async () => {

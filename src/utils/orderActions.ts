@@ -3,6 +3,7 @@ import type { Company, Order, Priority, Task, User } from '../types'
 import { deriveStatus } from './orders'
 
 export type NewOrderForm = {
+  orderNumber: string
   company: Company
   client: string
   product: string
@@ -12,7 +13,7 @@ export type NewOrderForm = {
 }
 
 export function canCreateOrders(user: User | null) {
-  return user?.dept === 'Admin'
+  return user?.dept === 'Admin' || user?.dept === 'Sales'
 }
 
 export function canDeleteOrders(user: User | null) {
@@ -20,6 +21,14 @@ export function canDeleteOrders(user: User | null) {
 }
 
 export function validateNewOrderForm(form: NewOrderForm) {
+  if (!form.orderNumber.trim()) {
+    return 'Please enter the order number.'
+  }
+
+  if (form.orderNumber.trim().length > 100) {
+    return 'The order number must be 100 characters or fewer.'
+  }
+
   if (!form.client.trim()) {
     return 'Please enter the client or organisation name.'
   }
@@ -35,8 +44,12 @@ export function validateNewOrderForm(form: NewOrderForm) {
   return null
 }
 
-export function createOrderId(randomValue = Math.random()) {
-  return `ORD-${String(Math.floor(randomValue * 900) + 100)}`
+export function createOrderId(sequenceNumber: number) {
+  return `ORD-${String(sequenceNumber).padStart(3, '0')}`
+}
+
+export function createOrderNumberKey(orderNumber: string) {
+  return encodeURIComponent(orderNumber.trim().toUpperCase()).replaceAll('.', '%2E')
 }
 
 export function buildNewOrder(
@@ -44,7 +57,7 @@ export function buildNewOrder(
   options?: {
     createdAt?: string
     id?: string
-    randomValue?: number
+    sequenceNumber?: number
   },
 ) {
   const validationError = validateNewOrderForm(form)
@@ -56,7 +69,10 @@ export function buildNewOrder(
   return {
     error: null,
     order: {
-      id: options?.id ?? createOrderId(options?.randomValue),
+      id: options?.id ?? (options?.sequenceNumber ? createOrderId(options.sequenceNumber) : ''),
+      ...(options?.sequenceNumber ? { sequenceNumber: options.sequenceNumber } : {}),
+      orderNumber: form.orderNumber.trim(),
+      orderNumberKey: createOrderNumberKey(form.orderNumber),
       company: form.company,
       client: form.client.trim(),
       product: form.product.trim(),
@@ -109,6 +125,46 @@ export function updateTaskStatusAndAdvance(
   }
 }
 
+export function sendTaskBackToPreviousDepartment(tasks: Task[], taskIndex: number) {
+  const nextTasks = tasks.map((task) => ({ ...task }))
+  const currentTask = nextTasks[taskIndex]
+  const previousTask = nextTasks[taskIndex - 1]
+
+  if (!currentTask || !previousTask) {
+    return {
+      error: 'Sales is the first department and cannot send an order back.',
+      tasks: nextTasks,
+    }
+  }
+
+  if (currentTask.status !== 'In Progress' && currentTask.status !== 'On Hold') {
+    return {
+      error: `${currentTask.dept} can send the order back only while it is active.`,
+      tasks: nextTasks,
+    }
+  }
+
+  if (previousTask.status !== 'Completed') {
+    return {
+      error: `${previousTask.dept} must be completed before this order can be sent back.`,
+      tasks: nextTasks,
+    }
+  }
+
+  if (!currentTask.remark.trim()) {
+    return {
+      error: `Add a ${currentTask.dept} progress remark explaining why the order is being sent back.`,
+      tasks: nextTasks,
+    }
+  }
+
+  previousTask.status = 'In Progress'
+  currentTask.status = 'Pending'
+  currentTask.holdReason = ''
+
+  return { error: null, tasks: nextTasks }
+}
+
 export function validateOrderTasks(tasks: Task[]) {
   const blockedTask = tasks.find(
     (task) => task.status === 'On Hold' && !task.holdReason.trim(),
@@ -131,18 +187,43 @@ export function applyOrderUpdates(
   }
 
   const userCanEditAnyTask = currentUser.dept === 'Admin'
-  const userTaskExists = order.tasks.some((task) => task.dept === currentUser.dept)
+  const userTaskIndex = order.tasks.findIndex((task) => task.dept === currentUser.dept)
+  const userTaskExists = userTaskIndex >= 0
 
   if (!userCanEditAnyTask && !userTaskExists) {
     throw new Error('You can only update tasks for your department.')
   }
 
+  const requestedUserTask = updates.tasks[userTaskIndex]
+  const requestedPreviousTask = updates.tasks[userTaskIndex - 1]
+  const originalUserTask = order.tasks[userTaskIndex]
+  const originalPreviousTask = order.tasks[userTaskIndex - 1]
+  const includesValidSendBack = Boolean(
+    !userCanEditAnyTask &&
+      userTaskIndex > 0 &&
+      originalUserTask &&
+      requestedUserTask &&
+      originalPreviousTask &&
+      requestedPreviousTask &&
+      (originalUserTask.status === 'In Progress' || originalUserTask.status === 'On Hold') &&
+      requestedUserTask.status === 'Pending' &&
+      originalPreviousTask.status === 'Completed' &&
+      requestedPreviousTask.status === 'In Progress' &&
+      requestedPreviousTask.assignee === originalPreviousTask.assignee &&
+      requestedPreviousTask.remark === originalPreviousTask.remark &&
+      requestedPreviousTask.nextDeptRemark === originalPreviousTask.nextDeptRemark &&
+      requestedPreviousTask.nextDeptRemarkTarget === originalPreviousTask.nextDeptRemarkTarget &&
+      requestedPreviousTask.holdReason === originalPreviousTask.holdReason,
+  )
   const mergedTasks = userCanEditAnyTask
     ? updates.tasks
-    : order.tasks.map((task) => {
+    : order.tasks.map((task, taskIndex) => {
         const nextTask = updates.tasks.find((candidate) => candidate.dept === task.dept)
 
-        if (!nextTask || task.dept !== currentUser.dept) {
+        const isOwnTask = task.dept === currentUser.dept
+        const isPreviousSendBackTask = includesValidSendBack && taskIndex === userTaskIndex - 1
+
+        if (!nextTask || (!isOwnTask && !isPreviousSendBackTask)) {
           return task
         }
 

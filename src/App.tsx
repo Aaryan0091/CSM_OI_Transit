@@ -9,6 +9,7 @@ import { THEMES } from './data/constants'
 import { isFirebaseConfigured } from './lib/firebase'
 import { useAuthSession } from './hooks/useAuthSession'
 import { useOrdersData } from './hooks/useOrdersData'
+import { canCreateOrders } from './utils/orderActions'
 
 const AddOrderModal = lazy(() =>
   import('./components/orders/AddOrderModal').then((module) => ({
@@ -165,7 +166,7 @@ export default function App() {
             theme={theme}
           />
         )}
-        {addOpen && currentUser.dept === 'Admin' && (
+        {addOpen && canCreateOrders(currentUser) && (
           <AddOrderModal onClose={() => setAddOpen(false)} onAdd={handleAdd} theme={theme} />
         )}
       </Suspense>

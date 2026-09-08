@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { isFirebaseConfigured } from '../lib/firebase'
 import {
+  createOrderInFirestore,
   deleteOrderFromFirestore,
   saveOrderToFirestore,
   subscribeToOrders,
@@ -125,28 +126,43 @@ export function useOrdersData(currentUser: User | null) {
     }
   }
 
-  const handleAdd = async (order: Order) => {
+  const handleAdd = async (order: Order): Promise<string | null> => {
     if (!currentUser || !canCreateOrders(currentUser)) {
-      setSyncError('Only admins can create new orders.')
-      return
+      const message = 'Only Admin and Sales users can create new orders.'
+      setSyncError(message)
+      return message
     }
 
-    setOrders((previous) => [order, ...previous])
-    setAddOpen(false)
-    setSyncError(null)
-
     if (!isFirebaseConfigured) {
-      setSyncError('Firebase is not configured, so new orders cannot be saved yet.')
-      return
+      const message = 'Firebase is not configured, so new orders cannot be saved yet.'
+      setSyncError(message)
+      return message
     }
 
     try {
-      await saveOrderToFirestore(order, currentUser, null)
+      const savedOrder = await createOrderInFirestore(order, currentUser)
+      setOrders((previous) => [
+        savedOrder,
+        ...previous.filter((existing) => existing.id !== savedOrder.id),
+      ])
+      setAddOpen(false)
       setSyncError(null)
+      return null
     } catch (error) {
       console.error('Failed to create Firestore order:', error)
-      setOrders((previous) => previous.filter((existing) => existing.id !== order.id))
-      setSyncError('The new order could not be created in Firestore.')
+      const errorCode =
+        typeof error === 'object' && error !== null && 'code' in error
+          ? String(error.code)
+          : ''
+      const message = errorCode.includes('appCheck/') || errorCode.includes('app-check/')
+        ? 'App Check rejected this browser. Register its private localhost debug token and try again.'
+        : error instanceof Error && error.message === 'ORDER_NUMBER_ALREADY_EXISTS'
+          ? 'That order number has already been used. Enter a different order number.'
+        : errorCode.includes('permission-denied')
+          ? 'Firestore rules denied the order-number allocation. Publish the latest rules and try again.'
+          : 'The new order could not be created in Firestore.'
+      setSyncError(message)
+      return message
     }
   }
 
@@ -203,6 +219,7 @@ export function useOrdersData(currentUser: User | null) {
       !search ||
       order.client.toLowerCase().includes(query) ||
       order.product.toLowerCase().includes(query) ||
+      order.orderNumber?.toLowerCase().includes(query) ||
       order.id.toLowerCase().includes(query)
     const matchDept =
       deptFilter === 'All' ||

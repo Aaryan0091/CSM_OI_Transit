@@ -126,3 +126,48 @@ describe('OrderModal deletion', () => {
     ).toBe(false)
   })
 })
+
+describe('OrderModal backward workflow', () => {
+  it('lets Design prepare a one-step return to Sales and save it', async () => {
+    const returnableOrder = structuredClone(order)
+    returnableOrder.tasks[0].status = 'Completed'
+    returnableOrder.tasks[1].status = 'In Progress'
+    const onSave = vi.fn(
+      async (
+        id: string,
+        updates: { tasks: Order['tasks']; deadline: string },
+      ): Promise<string | null> => {
+        void id
+        void updates
+        return null
+      },
+    )
+
+    render(
+      <OrderModal
+        order={returnableOrder}
+        onClose={vi.fn()}
+        onDelete={vi.fn(async () => null)}
+        onSave={onSave}
+        currentUser={user('Design')}
+        theme={THEMES.light}
+      />,
+    )
+
+    fireEvent.change(
+      screen.getByPlaceholderText("What's the current update from this department?"),
+      { target: { value: 'Sales dimensions must be corrected' } },
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Send Back to Sales' }))
+
+    expect(screen.getByRole('status').textContent).toContain(
+      'Ready to send back to Sales.',
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }))
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
+    const updates = onSave.mock.calls[0][1]
+    expect(updates.tasks[0].status).toBe('In Progress')
+    expect(updates.tasks[1].status).toBe('Pending')
+  })
+})

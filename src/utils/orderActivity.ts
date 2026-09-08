@@ -6,7 +6,7 @@ function changedLabel(label: string, before: string, after: string) {
 
 export function describeOrderChanges(previousOrder: Order | null, order: Order) {
   if (!previousOrder) {
-    return `Created order ${order.id} for ${order.client}`
+    return `Created order ${order.orderNumber ?? order.id} for ${order.client}`
   }
 
   const changes: string[] = []
