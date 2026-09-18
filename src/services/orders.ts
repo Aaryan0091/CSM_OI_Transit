@@ -14,13 +14,39 @@ import { getToken } from 'firebase/app-check'
 import { appCheck, db } from '../lib/firebase'
 import type { Order, OrderActivity, User } from '../types'
 import { describeOrderChanges } from '../utils/orderActivity'
-import { createOrderId, createOrderNumberKey } from '../utils/orderActions'
+import {
+  canCreateOrders,
+  createOrderId,
+  createOrderNumberKey,
+  validateOrderForCreation,
+} from '../utils/orderActions'
+import { OrderCreationError } from '../utils/orderErrors'
 import { normalizeOrder } from '../utils/orders'
 
 const MAX_ACTIVITY_RECORDS_PER_DELETE = 499
 const INITIAL_ORDER_SEQUENCE = 999
 
 export async function createOrderInFirestore(orderDraft: Order, user: User) {
+  const validationError = validateOrderForCreation(orderDraft)
+
+  if (validationError) {
+    throw new OrderCreationError('validation', validationError)
+  }
+
+  if (!user.emailVerified) {
+    throw new OrderCreationError(
+      'authorization',
+      'Verify your email address, then sign out and back in before creating an order.',
+    )
+  }
+
+  if (!canCreateOrders(user)) {
+    throw new OrderCreationError(
+      'authorization',
+      'Only Admin and Sales users can create new orders.',
+    )
+  }
+
   if (!db) {
     throw new Error('Firebase is not configured.')
   }
@@ -32,11 +58,7 @@ export async function createOrderInFirestore(orderDraft: Order, user: User) {
   }
 
   const counterReference = doc(firestore, 'metadata', 'orderCounter')
-  const orderNumber = orderDraft.orderNumber?.trim()
-
-  if (!orderNumber) {
-    throw new Error('An order number is required.')
-  }
+  const orderNumber = orderDraft.orderNumber!.trim()
 
   const orderNumberKey = createOrderNumberKey(orderNumber)
   const reservationReference = doc(
@@ -50,7 +72,10 @@ export async function createOrderInFirestore(orderDraft: Order, user: User) {
     const reservationSnapshot = await transaction.get(reservationReference)
 
     if (reservationSnapshot.exists()) {
-      throw new Error('ORDER_NUMBER_ALREADY_EXISTS')
+      throw new OrderCreationError(
+        'duplicate',
+        'That order number has already been used. Enter a different order number.',
+      )
     }
 
     const storedLastNumber = counterSnapshot.exists()

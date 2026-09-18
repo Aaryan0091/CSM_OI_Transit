@@ -2,40 +2,107 @@ import { useState } from 'react'
 import { themedInputStyle } from '../../data/constants'
 import { Field } from '../common/Field'
 import type { Company, Order, Priority, Theme } from '../../types'
-import { buildNewOrder } from '../../utils/orderActions'
+import { buildNewOrder, ORDER_INPUT_LIMITS } from '../../utils/orderActions'
+
+type AddOrderForm = {
+  orderNumber: string
+  company: Company
+  client: string
+  product: string
+  description: string
+  deadline: string
+  priority: Priority
+}
+
+const EMPTY_ORDER_FORM: AddOrderForm = {
+  orderNumber: '',
+  company: 'CSM',
+  client: '',
+  product: '',
+  description: '',
+  deadline: '',
+  priority: 'Medium',
+}
+
+function draftStorageKey(ownerId: string) {
+  return `csm-order-draft:v1:${ownerId}`
+}
+
+function isAddOrderForm(value: unknown): value is AddOrderForm {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  const draft = value as Partial<AddOrderForm>
+  return (
+    typeof draft.orderNumber === 'string' &&
+    (draft.company === 'CSM' || draft.company === 'Oriental') &&
+    typeof draft.client === 'string' &&
+    typeof draft.product === 'string' &&
+    typeof draft.description === 'string' &&
+    typeof draft.deadline === 'string' &&
+    ['Low', 'Medium', 'High', 'Critical'].includes(draft.priority ?? '')
+  )
+}
+
+function loadDraft(ownerId: string): AddOrderForm {
+  try {
+    const savedDraft = window.sessionStorage.getItem(draftStorageKey(ownerId))
+
+    if (!savedDraft) {
+      return EMPTY_ORDER_FORM
+    }
+
+    const parsedDraft: unknown = JSON.parse(savedDraft)
+    return isAddOrderForm(parsedDraft) ? parsedDraft : EMPTY_ORDER_FORM
+  } catch {
+    return EMPTY_ORDER_FORM
+  }
+}
+
+function saveDraft(ownerId: string, draft: AddOrderForm) {
+  try {
+    window.sessionStorage.setItem(draftStorageKey(ownerId), JSON.stringify(draft))
+  } catch {
+    // The form still works when storage is unavailable in a private browser context.
+  }
+}
+
+function clearDraft(ownerId: string) {
+  try {
+    window.sessionStorage.removeItem(draftStorageKey(ownerId))
+  } catch {
+    // Nothing else is required when storage is unavailable.
+  }
+}
 
 export function AddOrderModal({
   onClose,
   onAdd,
+  draftOwnerId,
   theme,
 }: {
   onClose: () => void
   onAdd: (order: Order) => Promise<string | null>
+  draftOwnerId: string
   theme: Theme
 }) {
-  const [form, setForm] = useState<{
-    orderNumber: string
-    company: Company
-    client: string
-    product: string
-    description: string
-    deadline: string
-    priority: Priority
-  }>({
-    orderNumber: '',
-    company: 'CSM',
-    client: '',
-    product: '',
-    description: '',
-    deadline: '',
-    priority: 'Medium',
-  })
+  const [form, setForm] = useState<AddOrderForm>(() => loadDraft(draftOwnerId))
   const [formError, setFormError] = useState('')
   const [isAdding, setIsAdding] = useState(false)
 
   const updateField = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => {
     setFormError('')
-    setForm((previous) => ({ ...previous, [key]: value }))
+    setForm((previous) => {
+      const nextForm = { ...previous, [key]: value }
+      saveDraft(draftOwnerId, nextForm)
+      return nextForm
+    })
+  }
+
+  const handleCancel = () => {
+    clearDraft(draftOwnerId)
+    onClose()
   }
 
   const handleAdd = async () => {
@@ -53,6 +120,9 @@ export function AddOrderModal({
 
       if (errorMessage) {
         setFormError(errorMessage)
+      } else {
+        clearDraft(draftOwnerId)
+        onClose()
       }
     } finally {
       setIsAdding(false)
@@ -112,6 +182,7 @@ export function AddOrderModal({
               value={form.orderNumber}
               onChange={(event) => updateField('orderNumber', event.target.value)}
               placeholder="Enter the order number"
+              maxLength={ORDER_INPUT_LIMITS.orderNumber}
               autoFocus
               style={themedInputStyle(theme)}
             />
@@ -134,6 +205,7 @@ export function AddOrderModal({
               value={form.client}
               onChange={(event) => updateField('client', event.target.value)}
               placeholder="Enter client or organisation name"
+              maxLength={ORDER_INPUT_LIMITS.client}
               style={themedInputStyle(theme)}
             />
           </Field>
@@ -143,6 +215,7 @@ export function AddOrderModal({
               value={form.product}
               onChange={(event) => updateField('product', event.target.value)}
               placeholder="e.g. FRP Cable Trays"
+              maxLength={ORDER_INPUT_LIMITS.product}
               style={themedInputStyle(theme)}
             />
           </Field>
@@ -152,6 +225,7 @@ export function AddOrderModal({
               value={form.description}
               onChange={(event) => updateField('description', event.target.value)}
               placeholder="e.g. x 200 mtrs or extra order details"
+              maxLength={ORDER_INPUT_LIMITS.description}
               rows={3}
               style={{ ...themedInputStyle(theme), resize: 'vertical' }}
             />
@@ -196,7 +270,7 @@ export function AddOrderModal({
           }}
         >
           <button
-            onClick={onClose}
+            onClick={handleCancel}
             disabled={isAdding}
             style={{
               padding: '10px 20px',

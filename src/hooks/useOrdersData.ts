@@ -12,6 +12,10 @@ import {
   canCreateOrders,
   canDeleteOrders,
 } from '../utils/orderActions'
+import {
+  getFirebaseErrorCode,
+  getOrderCreationErrorDetails,
+} from '../utils/orderErrors'
 
 export function useOrdersData(currentUser: User | null) {
   const currentUserId = currentUser?.uid
@@ -145,24 +149,18 @@ export function useOrdersData(currentUser: User | null) {
         savedOrder,
         ...previous.filter((existing) => existing.id !== savedOrder.id),
       ])
-      setAddOpen(false)
       setSyncError(null)
       return null
     } catch (error) {
-      console.error('Failed to create Firestore order:', error)
-      const errorCode =
-        typeof error === 'object' && error !== null && 'code' in error
-          ? String(error.code)
-          : ''
-      const message = errorCode.includes('appCheck/') || errorCode.includes('app-check/')
-        ? 'App Check rejected this browser. Register its private localhost debug token and try again.'
-        : error instanceof Error && error.message === 'ORDER_NUMBER_ALREADY_EXISTS'
-          ? 'That order number has already been used. Enter a different order number.'
-        : errorCode.includes('permission-denied')
-          ? 'Firestore rules denied the order-number allocation. Publish the latest rules and try again.'
-          : 'The new order could not be created in Firestore.'
-      setSyncError(message)
-      return message
+      const details = getOrderCreationErrorDetails(error)
+      console.error('Failed to create Firestore order:', {
+        firebaseCode: getFirebaseErrorCode(error) || null,
+        supportCode: details.supportCode,
+        retryable: details.retryable,
+        error,
+      })
+      setSyncError(details.message)
+      return details.message
     }
   }
 

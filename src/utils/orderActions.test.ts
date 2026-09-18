@@ -9,6 +9,7 @@ import {
   createOrderNumberKey,
   sendTaskBackToPreviousDepartment,
   updateTaskStatusAndAdvance,
+  validateNewOrderForm,
   validateOrderTasks,
 } from './orderActions'
 
@@ -128,6 +129,67 @@ describe('orderActions', () => {
       'Pending',
       'Pending',
     ])
+  })
+
+  it.each([
+    {
+      field: 'client',
+      value: 'C'.repeat(301),
+      message: 'The client or organisation name must be 300 characters or fewer.',
+    },
+    {
+      field: 'product',
+      value: 'P'.repeat(301),
+      message: 'The product name must be 300 characters or fewer.',
+    },
+    {
+      field: 'description',
+      value: 'D'.repeat(5001),
+      message: 'The description must be 5,000 characters or fewer.',
+    },
+  ])('reports the exact Firestore limit for an oversized $field', ({ field, value, message }) => {
+    const form = {
+      orderNumber: 'WO-101',
+      company: 'CSM' as const,
+      client: 'Test Client',
+      product: 'Test Product',
+      description: 'Details',
+      deadline: '2026-10-01',
+      priority: 'Medium' as const,
+      [field]: value,
+    }
+
+    expect(validateNewOrderForm(form)).toBe(message)
+  })
+
+  it('accepts spaces inside an order number and trims spaces around it', () => {
+    const result = buildNewOrder({
+      orderNumber: '  WO 101  ',
+      company: 'CSM',
+      client: 'Test Client',
+      product: 'Test Product',
+      description: '',
+      deadline: '2026-10-01',
+      priority: 'Medium',
+    })
+
+    expect(result.error).toBeNull()
+    expect(result.order?.orderNumber).toBe('WO 101')
+    expect(result.order?.orderNumberKey).toBe('WO%20101')
+  })
+
+  it('rejects an order number whose encoded reservation key exceeds the rule limit', () => {
+    expect(
+      validateNewOrderForm({
+        orderNumber: '🚀'.repeat(50),
+        company: 'CSM',
+        client: 'Test Client',
+        product: 'Test Product',
+        description: '',
+        deadline: '2026-10-01',
+        priority: 'Medium',
+      }),
+    ).toBe('The order number contains too many special characters. Please use a shorter order number.')
   })
 
   it('formats permanent sequential order IDs without a three-digit limit', () => {

@@ -167,7 +167,12 @@ export default function App() {
           />
         )}
         {addOpen && canCreateOrders(currentUser) && (
-          <AddOrderModal onClose={() => setAddOpen(false)} onAdd={handleAdd} theme={theme} />
+          <AddOrderModal
+            onClose={() => setAddOpen(false)}
+            onAdd={handleAdd}
+            draftOwnerId={currentUser.uid}
+            theme={theme}
+          />
         )}
       </Suspense>
     </div>

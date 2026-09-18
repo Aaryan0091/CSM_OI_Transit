@@ -12,6 +12,14 @@ export type NewOrderForm = {
   priority: Priority
 }
 
+export const ORDER_INPUT_LIMITS = {
+  orderNumber: 100,
+  orderNumberKey: 500,
+  client: 300,
+  product: 300,
+  description: 5000,
+} as const
+
 export function canCreateOrders(user: User | null) {
   return user?.dept === 'Admin' || user?.dept === 'Sales'
 }
@@ -21,20 +29,41 @@ export function canDeleteOrders(user: User | null) {
 }
 
 export function validateNewOrderForm(form: NewOrderForm) {
-  if (!form.orderNumber.trim()) {
+  const orderNumber = form.orderNumber.trim()
+  const client = form.client.trim()
+  const product = form.product.trim()
+  const description = form.description.trim()
+
+  if (!orderNumber) {
     return 'Please enter the order number.'
   }
 
-  if (form.orderNumber.trim().length > 100) {
-    return 'The order number must be 100 characters or fewer.'
+  if (orderNumber.length > ORDER_INPUT_LIMITS.orderNumber) {
+    return `The order number must be ${ORDER_INPUT_LIMITS.orderNumber} characters or fewer.`
   }
 
-  if (!form.client.trim()) {
+  if (createOrderNumberKey(orderNumber).length > ORDER_INPUT_LIMITS.orderNumberKey) {
+    return 'The order number contains too many special characters. Please use a shorter order number.'
+  }
+
+  if (!client) {
     return 'Please enter the client or organisation name.'
   }
 
-  if (!form.product.trim()) {
+  if (client.length > ORDER_INPUT_LIMITS.client) {
+    return `The client or organisation name must be ${ORDER_INPUT_LIMITS.client} characters or fewer.`
+  }
+
+  if (!product) {
     return 'Please enter the product name.'
+  }
+
+  if (product.length > ORDER_INPUT_LIMITS.product) {
+    return `The product name must be ${ORDER_INPUT_LIMITS.product} characters or fewer.`
+  }
+
+  if (description.length > ORDER_INPUT_LIMITS.description) {
+    return `The description must be ${ORDER_INPUT_LIMITS.description.toLocaleString('en-IN')} characters or fewer.`
   }
 
   if (!form.deadline.trim()) {
@@ -42,6 +71,18 @@ export function validateNewOrderForm(form: NewOrderForm) {
   }
 
   return null
+}
+
+export function validateOrderForCreation(order: Order) {
+  return validateNewOrderForm({
+    orderNumber: order.orderNumber ?? '',
+    company: order.company,
+    client: order.client,
+    product: order.product,
+    description: order.description,
+    deadline: order.deadline,
+    priority: order.priority,
+  })
 }
 
 export function createOrderId(sequenceNumber: number) {
