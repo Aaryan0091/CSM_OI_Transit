@@ -242,6 +242,8 @@ service cloud.firestore {
 
     function isValidDepartmentUpdate(data, department) {
       return isDepartment(department) &&
+        data.deadline is string &&
+        data.deadline.size() > 0 &&
         data.lastActivityId is string &&
         data.lastActivityId.size() > 0 &&
         data.tasks is list &&
@@ -350,8 +352,13 @@ service cloud.firestore {
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'tasks',
             'overallStatus',
+            'deadline',
             'lastActivityId'
           ]) &&
+          (
+            currentUserDepartment() == 'Sales' ||
+            request.resource.data.deadline == resource.data.deadline
+          ) &&
           onlyDepartmentAndAdjacentTasksChanged(
             resource.data,
             request.resource.data,

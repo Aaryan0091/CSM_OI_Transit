@@ -374,14 +374,25 @@ describe('Firestore security rules', () => {
     )
   })
 
-  test('blocks a department user from changing order metadata', async () => {
+  test('allows Sales to change an existing order deadline', async () => {
     await seedOrderAndProfiles()
     const database = authenticatedDatabase(SALES_USER_ID)
+
+    await assertSucceeds(
+      commitOrderUpdate(database, {
+        deadline: '2027-01-01',
+      }, 'sales-deadline-update', { uid: SALES_USER_ID, name: 'Sales User', dept: 'Sales' }),
+    )
+  })
+
+  test('blocks other departments from changing an existing order deadline', async () => {
+    await seedOrderAndProfiles()
+    const database = authenticatedDatabase(DESIGN_USER_ID)
 
     await assertFails(
       commitOrderUpdate(database, {
         deadline: '2027-01-01',
-      }, 'metadata-attack', { uid: SALES_USER_ID, name: 'Sales User', dept: 'Sales' }),
+      }, 'design-deadline-attack', { uid: DESIGN_USER_ID, name: 'Design User', dept: 'Design' }),
     )
   })
 

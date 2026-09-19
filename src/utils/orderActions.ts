@@ -28,6 +28,10 @@ export function canDeleteOrders(user: User | null) {
   return user?.dept === 'Admin' || user?.dept === 'Sales'
 }
 
+export function canEditOrderDeadline(user: User | null) {
+  return user?.dept === 'Admin' || user?.dept === 'Sales'
+}
+
 export function validateNewOrderForm(form: NewOrderForm) {
   const orderNumber = form.orderNumber.trim()
   const client = form.client.trim()
@@ -228,6 +232,7 @@ export function applyOrderUpdates(
   }
 
   const userCanEditAnyTask = currentUser.dept === 'Admin'
+  const userCanEditDeadline = canEditOrderDeadline(currentUser)
   const userTaskIndex = order.tasks.findIndex((task) => task.dept === currentUser.dept)
   const userTaskExists = userTaskIndex >= 0
 
@@ -277,14 +282,14 @@ export function applyOrderUpdates(
     throw new Error(taskValidationError)
   }
 
-  if (userCanEditAnyTask && !updates.deadline.trim()) {
+  if (userCanEditDeadline && !updates.deadline.trim()) {
     throw new Error('Please choose a deadline before saving this order.')
   }
 
   return {
     ...order,
     tasks: mergedTasks,
-    deadline: userCanEditAnyTask ? updates.deadline : order.deadline,
+    deadline: userCanEditDeadline ? updates.deadline : order.deadline,
     overallStatus: deriveStatus(mergedTasks),
   }
 }

@@ -5,6 +5,7 @@ import {
   buildNewOrder,
   canCreateOrders,
   canDeleteOrders,
+  canEditOrderDeadline,
   createOrderId,
   createOrderNumberKey,
   sendTaskBackToPreviousDepartment,
@@ -82,6 +83,13 @@ describe('orderActions', () => {
     expect(canDeleteOrders(salesUser)).toBe(true)
     expect(canDeleteOrders(designUser)).toBe(false)
     expect(canDeleteOrders(null)).toBe(false)
+  })
+
+  it('allows only Admin and Sales users to edit existing deadlines', () => {
+    expect(canEditOrderDeadline(adminUser)).toBe(true)
+    expect(canEditOrderDeadline(salesUser)).toBe(true)
+    expect(canEditOrderDeadline(designUser)).toBe(false)
+    expect(canEditOrderDeadline(null)).toBe(false)
   })
 
   it('validates required fields when building a new order', () => {
@@ -326,6 +334,20 @@ describe('orderActions', () => {
 
     expect(updated.deadline).toBe('2026-08-30')
     expect(updated.tasks.find((task) => task.dept === 'Procurement')?.status).toBe('Completed')
+  })
+
+  it('lets Sales update an existing order deadline', () => {
+    const order = cloneOrder(baseOrder)
+    const updated = applyOrderUpdates(
+      order,
+      {
+        deadline: '2026-09-15',
+        tasks: order.tasks,
+      },
+      salesUser,
+    )
+
+    expect(updated.deadline).toBe('2026-09-15')
   })
 
   it('lets non-admin users update only their own department', () => {

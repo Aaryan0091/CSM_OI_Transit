@@ -12,6 +12,7 @@ import type { Department, Order, Status, Task, Theme, User } from '../../types'
 import { normalizeTask } from '../../utils/orders'
 import {
   canDeleteOrders,
+  canEditOrderDeadline,
   sendTaskBackToPreviousDepartment,
   updateTaskStatusAndAdvance,
   validateOrderTasks,
@@ -272,6 +273,7 @@ export function OrderModal({
 
   const canEdit = (dept: Department) => currentUser.dept === 'Admin' || currentUser.dept === dept
   const adminEditable = currentUser.dept === 'Admin'
+  const deadlineEditable = canEditOrderDeadline(currentUser)
   const visibleTasks = adminEditable
     ? tasks.map((task, index) => ({ task, index }))
     : tasks
@@ -492,7 +494,7 @@ export function OrderModal({
                   >
                     {deadline}
                   </div>
-                  {adminEditable && (
+                  {deadlineEditable && (
                     <button
                       type="button"
                       onClick={() => setIsChangingDeadline((previous) => !previous)}
@@ -511,7 +513,7 @@ export function OrderModal({
                       {isChangingDeadline ? 'Cancel Deadline Change' : 'Change Deadline'}
                     </button>
                   )}
-                  {adminEditable && isChangingDeadline && (
+                  {deadlineEditable && isChangingDeadline && (
                     <input
                       type="date"
                       value={deadline}
@@ -738,7 +740,7 @@ export function OrderModal({
                   return
                 }
 
-                if (currentUser.dept === 'Admin' && !deadline.trim()) {
+                if (deadlineEditable && !deadline.trim()) {
                   setSaveError('Please choose a deadline before saving this order.')
                   return
                 }

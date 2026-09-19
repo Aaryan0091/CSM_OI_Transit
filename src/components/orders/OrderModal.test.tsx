@@ -171,3 +171,47 @@ describe('OrderModal backward workflow', () => {
     expect(updates.tasks[1].status).toBe('Pending')
   })
 })
+
+describe('OrderModal deadline access', () => {
+  it('lets Sales change and save an existing deadline', async () => {
+    const onSave = vi.fn(
+      async (
+        id: string,
+        updates: { tasks: Order['tasks']; deadline: string },
+      ): Promise<string | null> => {
+        void id
+        void updates
+        return null
+      },
+    )
+
+    render(
+      <OrderModal
+        order={order}
+        onClose={vi.fn()}
+        onDelete={vi.fn(async () => null)}
+        onSave={onSave}
+        currentUser={user('Sales')}
+        theme={THEMES.light}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change Deadline' }))
+    fireEvent.change(screen.getByDisplayValue('2026-08-30'), {
+      target: { value: '2026-09-15' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }))
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
+    expect(onSave.mock.calls[0][1].deadline).toBe('2026-09-15')
+  })
+
+  it.each(['Design', 'Procurement', 'Production', 'QC', 'Dispatch'] as const)(
+    'keeps deadline editing hidden from %s',
+    (department) => {
+      renderModal(user(department))
+
+      expect(screen.queryByRole('button', { name: 'Change Deadline' })).toBeNull()
+    },
+  )
+})
