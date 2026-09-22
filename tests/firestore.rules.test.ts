@@ -10,6 +10,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -17,6 +18,7 @@ import {
   type Firestore,
 } from 'firebase/firestore'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
+import { buildNewOrder } from '../src/utils/orderActions'
 
 const PROJECT_ID = 'csm-order-tracker-rules-test'
 const SALES_USER_ID = 'sales-user'
@@ -525,6 +527,59 @@ describe('Firestore security rules', () => {
     )
 
     await assertSucceeds(batch.commit())
+  })
+
+  test('allows Sales to create the next order when the permanent counter already exists', async () => {
+    await seedOrderAndProfiles()
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'metadata', 'orderCounter'), {
+        lastNumber: 1000,
+        updatedAt: serverTimestamp(),
+      })
+    })
+
+    const database = authenticatedDatabase(SALES_USER_ID)
+    const result = buildNewOrder({
+      orderNumber: '52265017101898',
+      company: 'CSM',
+      client: 'SSE/CR-store/PL WR',
+      product: 'ATTACHMENT WALL',
+      description: 'Attachment wall for lavatory accessories',
+      deadline: '2026-11-15',
+      priority: 'Medium',
+    }, { id: SECOND_SEQUENTIAL_ORDER_ID, sequenceNumber: 1001 })
+    expect(result.error).toBeNull()
+    expect(result.order).not.toBeNull()
+
+    const order = result.order!
+    await assertSucceeds(runTransaction(database, async (transaction) => {
+      const counterReference = doc(database, 'metadata', 'orderCounter')
+      const reservationReference = doc(
+        database,
+        'orderNumberReservations',
+        order.orderNumberKey!,
+      )
+      await transaction.get(counterReference)
+      await transaction.get(reservationReference)
+
+      const activityId = 'sales-next-create'
+      transaction.set(counterReference, {
+        lastNumber: 1001,
+        updatedAt: serverTimestamp(),
+      })
+      transaction.set(
+        reservationReference,
+        orderNumberReservation(SECOND_SEQUENTIAL_ORDER_ID, order.orderNumber!, SALES_USER_ID),
+      )
+      transaction.set(doc(database, 'orders', SECOND_SEQUENTIAL_ORDER_ID), {
+        ...order,
+        lastActivityId: activityId,
+      })
+      transaction.set(
+        doc(database, 'orders', SECOND_SEQUENTIAL_ORDER_ID, 'activity', activityId),
+        activityRecord(SALES_USER_ID, 'Sales User', 'Sales', 'created'),
+      )
+    }))
   })
 
   test('blocks other departments from changing the order counter', async () => {

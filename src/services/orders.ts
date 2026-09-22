@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getDocFromServer,
   getDocs,
   limit,
   onSnapshot,
@@ -11,7 +12,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { getToken } from 'firebase/app-check'
-import { appCheck, db } from '../lib/firebase'
+import { appCheck, auth, db } from '../lib/firebase'
 import type { Order, OrderActivity, User } from '../types'
 import { describeOrderChanges } from '../utils/orderActivity'
 import {
@@ -25,6 +26,60 @@ import { normalizeOrder } from '../utils/orders'
 
 const MAX_ACTIVITY_RECORDS_PER_DELETE = 499
 const INITIAL_ORDER_SEQUENCE = 999
+
+async function loadFreshOrderCreator(user: User, firestore: NonNullable<typeof db>) {
+  const firebaseUser = auth?.currentUser
+
+  if (!firebaseUser || firebaseUser.uid !== user.uid) {
+    throw new OrderCreationError(
+      'authorization',
+      'Your sign-in session changed. Sign out, sign back in, and try again.',
+    )
+  }
+
+  const tokenResult = await firebaseUser.getIdTokenResult(true)
+
+  if (tokenResult.claims.email_verified !== true) {
+    throw new OrderCreationError(
+      'authorization',
+      'Verify your email address, then sign out and back in before creating an order.',
+    )
+  }
+
+  const profileSnapshot = await getDocFromServer(doc(firestore, 'users', user.uid))
+
+  if (!profileSnapshot.exists()) {
+    throw new OrderCreationError(
+      'authorization',
+      'Your Firestore user profile is missing. Contact an administrator before creating an order.',
+    )
+  }
+
+  const profile = profileSnapshot.data()
+  const creator: User = {
+    uid: user.uid,
+    email: firebaseUser.email ?? user.email,
+    emailVerified: true,
+    name: typeof profile.name === 'string' ? profile.name.trim() : '',
+    dept: tokenResult.claims.admin === true ? 'Admin' : profile.dept,
+  }
+
+  if (!creator.name) {
+    throw new OrderCreationError(
+      'authorization',
+      'Your Firestore profile name is missing. Contact an administrator before creating an order.',
+    )
+  }
+
+  if (!canCreateOrders(creator)) {
+    throw new OrderCreationError(
+      'authorization',
+      'Only Admin and Sales users can create new orders.',
+    )
+  }
+
+  return creator
+}
 
 export async function createOrderInFirestore(orderDraft: Order, user: User) {
   const validationError = validateOrderForCreation(orderDraft)
@@ -56,6 +111,8 @@ export async function createOrderInFirestore(orderDraft: Order, user: User) {
   if (appCheck) {
     await getToken(appCheck)
   }
+
+  const creator = await loadFreshOrderCreator(user, firestore)
 
   const counterReference = doc(firestore, 'metadata', 'orderCounter')
   const orderNumber = orderDraft.orderNumber!.trim()
@@ -104,16 +161,16 @@ export async function createOrderInFirestore(orderDraft: Order, user: User) {
       orderId: order.id,
       orderNumber: order.orderNumber,
       reservedAt: serverTimestamp(),
-      reservedBy: user.uid,
+      reservedBy: creator.uid,
     })
     transaction.set(orderReference, {
       ...order,
       lastActivityId: activityReference.id,
     })
     transaction.set(activityReference, {
-      actorUid: user.uid,
-      actorName: user.name,
-      actorDept: user.dept,
+      actorUid: creator.uid,
+      actorName: creator.name,
+      actorDept: creator.dept,
       action: 'created',
       summary: describeOrderChanges(null, order),
       createdAt: serverTimestamp(),
