@@ -215,3 +215,75 @@ describe('OrderModal deadline access', () => {
     },
   )
 })
+
+describe('OrderModal unsaved changes', () => {
+  function renderWithCloseHandler() {
+    const onClose = vi.fn()
+
+    render(
+      <OrderModal
+        order={order}
+        onClose={onClose}
+        onDelete={vi.fn(async () => null)}
+        onSave={vi.fn(async () => null)}
+        currentUser={user('Sales')}
+        theme={THEMES.light}
+      />,
+    )
+
+    return onClose
+  }
+
+  it('closes immediately when nothing has changed', () => {
+    const onClose = renderWithCloseHandler()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+  })
+
+  it.each(['close button', 'Cancel button', 'backdrop'] as const)(
+    'warns before closing edited work through the %s',
+    (exitPath) => {
+      const onClose = renderWithCloseHandler()
+      fireEvent.change(screen.getByPlaceholderText('Who is working on this?'), {
+        target: { value: 'Aaryan' },
+      })
+
+      if (exitPath === 'close button') {
+        fireEvent.click(screen.getByRole('button', { name: 'Close order' }))
+      } else if (exitPath === 'Cancel button') {
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+      } else {
+        fireEvent.click(screen.getByTestId('order-modal-backdrop'))
+      }
+
+      expect(screen.getByRole('heading', { name: 'Discard unsaved changes?' })).not.toBeNull()
+      expect(onClose).not.toHaveBeenCalled()
+    },
+  )
+
+  it('continues editing without losing the entered values', () => {
+    const onClose = renderWithCloseHandler()
+    const assigneeInput = screen.getByPlaceholderText('Who is working on this?')
+    fireEvent.change(assigneeInput, { target: { value: 'Aaryan' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue Editing' }))
+
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect((assigneeInput as HTMLInputElement).value).toBe('Aaryan')
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('closes only after discard is confirmed', () => {
+    const onClose = renderWithCloseHandler()
+    fireEvent.change(screen.getByPlaceholderText('Who is working on this?'), {
+      target: { value: 'Aaryan' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Close order' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Discard Changes' }))
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+})

@@ -63,10 +63,10 @@ export function getOrderCreationErrorDetails(error: unknown): OrderCreationError
   }
 
   if (code.includes('permission-denied')) {
-    const supportCode = 'ORDER-CREATE-PERMISSION'
+    const supportCode = 'ORDER-CREATE-RULES'
     return {
       message: withReference(
-        'Your account is not currently authorized to create this order. Confirm that your email is verified and your profile is Admin or Sales, then sign out and back in.',
+        'Firestore denied the secure order transaction after your account check. Your draft is still saved. Ask an administrator to confirm that the latest Firestore rules are published for this project.',
         supportCode,
       ),
       supportCode,

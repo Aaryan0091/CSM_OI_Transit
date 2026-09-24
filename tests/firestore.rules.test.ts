@@ -582,6 +582,63 @@ describe('Firestore security rules', () => {
     }))
   })
 
+  test('allows a legacy Sales profile name with outer whitespace to create an order', async () => {
+    await seedOrderAndProfiles()
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      const database = context.firestore()
+      await setDoc(doc(database, 'users', SALES_USER_ID), {
+        name: ' Sales User ',
+        email: 'sales@example.com',
+        dept: 'Sales',
+      })
+      await setDoc(doc(database, 'metadata', 'orderCounter'), {
+        lastNumber: 1000,
+        updatedAt: serverTimestamp(),
+      })
+    })
+
+    const database = authenticatedDatabase(SALES_USER_ID)
+    const result = buildNewOrder({
+      orderNumber: 'PO-LEGACY-SALES',
+      company: 'CSM',
+      client: 'Legacy Sales Client',
+      product: 'Cable Tray',
+      description: '',
+      deadline: '2026-11-15',
+      priority: 'Medium',
+    }, { id: SECOND_SEQUENTIAL_ORDER_ID, sequenceNumber: 1001 })
+    const order = result.order!
+
+    await assertSucceeds(runTransaction(database, async (transaction) => {
+      const counterReference = doc(database, 'metadata', 'orderCounter')
+      const reservationReference = doc(
+        database,
+        'orderNumberReservations',
+        order.orderNumberKey!,
+      )
+      await transaction.get(counterReference)
+      await transaction.get(reservationReference)
+
+      const activityId = 'legacy-sales-create'
+      transaction.set(counterReference, {
+        lastNumber: 1001,
+        updatedAt: serverTimestamp(),
+      })
+      transaction.set(
+        reservationReference,
+        orderNumberReservation(SECOND_SEQUENTIAL_ORDER_ID, order.orderNumber!, SALES_USER_ID),
+      )
+      transaction.set(doc(database, 'orders', SECOND_SEQUENTIAL_ORDER_ID), {
+        ...order,
+        lastActivityId: activityId,
+      })
+      transaction.set(
+        doc(database, 'orders', SECOND_SEQUENTIAL_ORDER_ID, 'activity', activityId),
+        activityRecord(SALES_USER_ID, ' Sales User ', 'Sales', 'created'),
+      )
+    }))
+  })
+
   test('blocks other departments from changing the order counter', async () => {
     await seedOrderAndProfiles()
     const database = authenticatedDatabase(DESIGN_USER_ID)

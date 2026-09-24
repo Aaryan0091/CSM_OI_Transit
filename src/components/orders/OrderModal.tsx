@@ -209,6 +209,169 @@ function DeleteOrderConfirmation({
   )
 }
 
+function DiscardChangesConfirmation({
+  onCancel,
+  onConfirm,
+  theme,
+}: {
+  onCancel: () => void
+  onConfirm: () => void
+  theme: Theme
+}) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const cancelButtonRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    cancelButtonRef.current?.focus()
+  }, [])
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      onCancel()
+      return
+    }
+
+    if (event.key !== 'Tab') {
+      return
+    }
+
+    const buttons = Array.from(
+      dialogRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [],
+    )
+    const firstButton = buttons[0]
+    const lastButton = buttons.at(-1)
+
+    if (event.shiftKey && document.activeElement === firstButton) {
+      event.preventDefault()
+      lastButton?.focus()
+    } else if (!event.shiftKey && document.activeElement === lastButton) {
+      event.preventDefault()
+      firstButton?.focus()
+    }
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1100,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 20,
+        background: 'rgba(15, 23, 42, 0.62)',
+      }}
+      onClick={(event) => {
+        event.stopPropagation()
+
+        if (event.target === event.currentTarget) {
+          onCancel()
+        }
+      }}
+    >
+      <div
+        ref={dialogRef}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="discard-changes-title"
+        aria-describedby="discard-changes-description"
+        onKeyDown={handleKeyDown}
+        style={{
+          width: '100%',
+          maxWidth: 440,
+          borderRadius: 16,
+          border: `1px solid ${theme.border}`,
+          background: theme.surface,
+          boxShadow: '0 24px 64px rgba(15, 23, 42, 0.35)',
+          padding: 24,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+          <div
+            aria-hidden="true"
+            style={{
+              flex: '0 0 auto',
+              width: 38,
+              height: 38,
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: '#FEF3C7',
+              color: '#92400E',
+              fontSize: 20,
+              fontWeight: 900,
+            }}
+          >
+            !
+          </div>
+          <div>
+            <h2
+              id="discard-changes-title"
+              style={{ margin: 0, color: theme.text, fontSize: 19, lineHeight: 1.35 }}
+            >
+              Discard unsaved changes?
+            </h2>
+            <p
+              id="discard-changes-description"
+              style={{ margin: '8px 0 0', color: theme.textMuted, fontSize: 14, lineHeight: 1.55 }}
+            >
+              Your deadline, status, assignee, or remark changes have not been saved. If you leave
+              now, those changes will be lost.
+            </p>
+          </div>
+        </div>
+
+        <div
+          style={{
+            marginTop: 22,
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: 10,
+            flexWrap: 'wrap',
+          }}
+        >
+          <button
+            ref={cancelButtonRef}
+            type="button"
+            onClick={onCancel}
+            style={{
+              minHeight: 44,
+              padding: '10px 18px',
+              borderRadius: 8,
+              border: `1px solid ${theme.border}`,
+              background: '#A8F5E9',
+              color: '#17324D',
+              cursor: 'pointer',
+              fontWeight: 700,
+            }}
+          >
+            Continue Editing
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            style={{
+              minHeight: 44,
+              padding: '10px 18px',
+              borderRadius: 8,
+              border: '1px solid #B91C1C',
+              background: '#B91C1C',
+              color: '#FFFFFF',
+              cursor: 'pointer',
+              fontWeight: 800,
+            }}
+          >
+            Discard Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function OrderModal({
   order,
   onClose,
@@ -244,8 +407,25 @@ export function OrderModal({
   const [workflowMessage, setWorkflowMessage] = useState('')
   const [deleteError, setDeleteError] = useState('')
   const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false)
+  const [isDiscardConfirmationOpen, setIsDiscardConfirmationOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+
+  const hasUnsavedChanges =
+    deadline !== order.deadline || JSON.stringify(tasks) !== JSON.stringify(normalizedTasks)
+
+  const requestClose = () => {
+    if (isDeleting || isSaving) {
+      return
+    }
+
+    if (hasUnsavedChanges) {
+      setIsDiscardConfirmationOpen(true)
+      return
+    }
+
+    onClose()
+  }
 
   const update = <K extends keyof Task>(index: number, field: K, value: Task[K]) => {
     setSaveError('')
@@ -304,7 +484,12 @@ export function OrderModal({
         justifyContent: 'center',
         padding: 16,
       }}
-      onClick={onClose}
+      data-testid="order-modal-backdrop"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          requestClose()
+        }
+      }}
     >
       <div
         style={{
@@ -343,16 +528,20 @@ export function OrderModal({
               )}
             </div>
             <button
-              onClick={onClose}
+              type="button"
+              aria-label="Close order"
+              onClick={requestClose}
+              disabled={isDeleting || isSaving}
               style={{
                 background: theme.surfaceAlt,
                 border: 'none',
                 borderRadius: 8,
                 width: 32,
                 height: 32,
-                cursor: 'pointer',
+                cursor: isDeleting || isSaving ? 'wait' : 'pointer',
                 fontSize: 18,
                 color: theme.textMuted,
+                opacity: isDeleting || isSaving ? 0.65 : 1,
               }}
             >
               x
@@ -717,16 +906,18 @@ export function OrderModal({
               </button>
             )}
             <button
-              onClick={onClose}
-              disabled={isDeleting}
+              type="button"
+              onClick={requestClose}
+              disabled={isDeleting || isSaving}
               style={{
                 padding: '10px 20px',
                 borderRadius: 8,
                 border: `1px solid ${theme.border}`,
                 background: theme.surface,
-                cursor: 'pointer',
+                cursor: isDeleting || isSaving ? 'wait' : 'pointer',
                 fontWeight: 600,
                 color: theme.textMuted,
+                opacity: isDeleting || isSaving ? 0.65 : 1,
               }}
             >
               Cancel
@@ -795,6 +986,16 @@ export function OrderModal({
             } finally {
               setIsDeleting(false)
             }
+          }}
+        />
+      )}
+      {isDiscardConfirmationOpen && (
+        <DiscardChangesConfirmation
+          theme={theme}
+          onCancel={() => setIsDiscardConfirmationOpen(false)}
+          onConfirm={() => {
+            setIsDiscardConfirmationOpen(false)
+            onClose()
           }}
         />
       )}

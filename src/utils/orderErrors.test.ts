@@ -14,12 +14,13 @@ describe('order creation errors', () => {
     ).toBe('The description is too long.')
   })
 
-  it('reports authorization failures without blaming deployed rules', () => {
+  it('reports a post-account-check rules denial without asking for another sign-in', () => {
     const details = getOrderCreationErrorDetails({ code: 'firestore/permission-denied' })
 
-    expect(details.message).toContain('not currently authorized')
-    expect(details.message).not.toContain('rules')
-    expect(details.supportCode).toBe('ORDER-CREATE-PERMISSION')
+    expect(details.supportCode).toBe('ORDER-CREATE-RULES')
+    expect(details.message).toContain('after your account check')
+    expect(details.message).toContain('latest Firestore rules')
+    expect(details.message).not.toContain('sign out and back in')
     expect(details.retryable).toBe(false)
   })
 

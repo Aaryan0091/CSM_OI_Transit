@@ -56,15 +56,18 @@ async function loadFreshOrderCreator(user: User, firestore: NonNullable<typeof d
   }
 
   const profile = profileSnapshot.data()
+  const storedProfileName = typeof profile.name === 'string' ? profile.name : ''
   const creator: User = {
     uid: user.uid,
     email: firebaseUser.email ?? user.email,
     emailVerified: true,
-    name: typeof profile.name === 'string' ? profile.name.trim() : '',
+    // Firestore rules compare actorName with the stored profile value exactly.
+    // Keep legacy whitespace here so an otherwise valid Sales profile is not rejected.
+    name: storedProfileName,
     dept: tokenResult.claims.admin === true ? 'Admin' : profile.dept,
   }
 
-  if (!creator.name) {
+  if (!creator.name.trim()) {
     throw new OrderCreationError(
       'authorization',
       'Your Firestore profile name is missing. Contact an administrator before creating an order.',
