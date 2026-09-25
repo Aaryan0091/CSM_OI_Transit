@@ -186,7 +186,7 @@ describe('Firestore security rules', () => {
     return testEnvironment.authenticatedContext(uid, {
       email: `${uid}@example.com`,
       email_verified: options.emailVerified ?? true,
-      admin: options.admin ?? false,
+      ...(options.admin === undefined ? {} : { admin: options.admin }),
     }).firestore()
   }
 

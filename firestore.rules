@@ -11,7 +11,7 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isVerified() && request.auth.token.admin == true;
+      return isVerified() && request.auth.token.get('admin', false) == true;
     }
 
     function isDepartment(value) {
