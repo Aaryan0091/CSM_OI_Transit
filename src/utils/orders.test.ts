@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { Order, Status, Task } from '../types'
-import { normalizeOrder, normalizeTask, pipelineProgressPct } from './orders'
+import {
+  formatDate,
+  formatDateTime,
+  normalizeOrder,
+  normalizeTask,
+  pipelineProgressPct,
+  sortOrders,
+} from './orders'
 
 const departments = ['Sales', 'Design', 'Procurement', 'Production', 'QC', 'Dispatch'] as const
 
@@ -114,5 +121,47 @@ describe('normalizeOrder', () => {
     } as Order
 
     expect(normalizeOrder(order)).not.toHaveProperty('legacyProgress')
+  })
+})
+
+describe('date formatting', () => {
+  it('shows stored yyyy-mm-dd dates as dd-mm-yyyy', () => {
+    expect(formatDate('2026-08-12')).toBe('12-08-2026')
+  })
+
+  it('reformats dates inside activity summaries', () => {
+    expect(formatDate('Deadline: 2026-09-01 -> 2026-09-15; Sales status: In Progress -> Completed')).toBe(
+      'Deadline: 01-09-2026 -> 15-09-2026; Sales status: In Progress -> Completed',
+    )
+  })
+
+  it('formats timestamps as dd-mm-yyyy, HH:MM in local time', () => {
+    expect(formatDateTime(new Date(2026, 9, 4, 9, 5).toISOString())).toBe('04-10-2026, 09:05')
+  })
+})
+
+describe('sortOrders', () => {
+  const orders = [
+    { id: 'ORD-1001', deadline: '2026-11-20', createdAt: '2026-10-01' },
+    { id: 'ORD-1002', deadline: '2026-10-10', createdAt: '2026-10-02' },
+    { id: 'ORD-1003', deadline: '2026-12-05', createdAt: '2026-10-03' },
+  ] as Order[]
+  const ids = (sorted: Order[]) => sorted.map((order) => order.id)
+
+  it('puts the nearest deadline first', () => {
+    expect(ids(sortOrders(orders, 'deadline-asc'))).toEqual(['ORD-1002', 'ORD-1001', 'ORD-1003'])
+  })
+
+  it('puts the farthest deadline first', () => {
+    expect(ids(sortOrders(orders, 'deadline-desc'))).toEqual(['ORD-1003', 'ORD-1001', 'ORD-1002'])
+  })
+
+  it('puts the newest orders first', () => {
+    expect(ids(sortOrders(orders, 'newest'))).toEqual(['ORD-1003', 'ORD-1002', 'ORD-1001'])
+  })
+
+  it('does not mutate the original list', () => {
+    sortOrders(orders, 'deadline-asc')
+    expect(ids(orders)).toEqual(['ORD-1001', 'ORD-1002', 'ORD-1003'])
   })
 })

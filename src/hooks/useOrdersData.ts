@@ -16,6 +16,7 @@ import {
   getFirebaseErrorCode,
   getOrderCreationErrorDetails,
 } from '../utils/orderErrors'
+import { sortOrders, type OrderSort } from '../utils/orders'
 
 export function useOrdersData(currentUser: User | null) {
   const currentUserId = currentUser?.uid
@@ -26,6 +27,7 @@ export function useOrdersData(currentUser: User | null) {
   const [search, setSearch] = useState('')
   const [companyFilter, setCompanyFilter] = useState<'All' | Company>('All')
   const [deptFilter, setDeptFilter] = useState<'All' | Department>('All')
+  const [sort, setSort] = useState<OrderSort>('deadline-asc')
   const [loadedForUserId, setLoadedForUserId] = useState<string | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
 
@@ -209,7 +211,7 @@ export function useOrdersData(currentUser: User | null) {
     }
   }
 
-  const filtered = visibleOrders.filter((order) => {
+  const matchingOrders = visibleOrders.filter((order) => {
     const query = search.toLowerCase()
     const matchStatus = filter === 'All' || order.overallStatus === filter
     const matchCompany = companyFilter === 'All' || order.company === companyFilter
@@ -229,6 +231,7 @@ export function useOrdersData(currentUser: User | null) {
 
     return matchStatus && matchCompany && matchSearch && matchDept
   })
+  const filtered = sortOrders(matchingOrders, sort)
 
   const stats = {
     total: visibleOrders.length,
@@ -255,6 +258,8 @@ export function useOrdersData(currentUser: User | null) {
     setFilter,
     setSearch,
     setSelected,
+    setSort,
+    sort,
     stats,
     syncError,
   }

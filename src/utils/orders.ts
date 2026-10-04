@@ -8,6 +8,49 @@ export function daysLeft(deadline: string) {
   return Math.ceil((target.getTime() - today.getTime()) / 86400000)
 }
 
+const ISO_DATE_PATTERN = /\b(\d{4})-(\d{2})-(\d{2})\b/g
+
+// Dates are stored as yyyy-mm-dd (required by date inputs, sorting, and Firestore rules)
+// and only shown to users as dd-mm-yyyy.
+export function formatDate(isoDate: string) {
+  return isoDate.replace(ISO_DATE_PATTERN, '$3-$2-$1')
+}
+
+export function formatDateTime(value: string) {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  const pad = (part: number) => String(part).padStart(2, '0')
+
+  return `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()}, ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+export type OrderSort = 'deadline-asc' | 'deadline-desc' | 'newest'
+
+export const ORDER_SORT_OPTIONS: { value: OrderSort; label: string }[] = [
+  { value: 'deadline-asc', label: 'Deadline: nearest first' },
+  { value: 'deadline-desc', label: 'Deadline: farthest first' },
+  { value: 'newest', label: 'Newest orders first' },
+]
+
+// Deadlines are yyyy-mm-dd strings, so string comparison matches date order.
+export function sortOrders(orders: Order[], sort: OrderSort) {
+  return [...orders].sort((left, right) => {
+    if (sort !== 'newest') {
+      const byDeadline = left.deadline.localeCompare(right.deadline)
+
+      if (byDeadline !== 0) {
+        return sort === 'deadline-asc' ? byDeadline : -byDeadline
+      }
+    }
+
+    return right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id)
+  })
+}
+
 export function progressPct(tasks: Task[]) {
   const done = tasks.filter((task) => task.status === 'Completed' || task.status === 'Dispatched').length
   return Math.round((done / tasks.length) * 100)

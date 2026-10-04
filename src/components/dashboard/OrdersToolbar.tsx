@@ -1,5 +1,6 @@
 import { DEPARTMENTS, themedInputStyle } from '../../data/constants'
 import type { Company, Department, Order, Theme } from '../../types'
+import { ORDER_SORT_OPTIONS, type OrderSort } from '../../utils/orders'
 
 export function OrdersToolbar({
   search,
@@ -10,6 +11,8 @@ export function OrdersToolbar({
   onCompanyFilterChange,
   deptFilter,
   onDeptFilterChange,
+  sort,
+  onSortChange,
   theme,
 }: {
   search: string
@@ -20,6 +23,8 @@ export function OrdersToolbar({
   onCompanyFilterChange: (value: 'All' | Company) => void
   deptFilter: 'All' | Department
   onDeptFilterChange: (value: 'All' | Department) => void
+  sort: OrderSort
+  onSortChange: (value: OrderSort) => void
   theme: Theme
 }) {
   return (
@@ -69,6 +74,18 @@ export function OrdersToolbar({
         <option value="All">All Departments</option>
         {DEPARTMENTS.map((department) => (
           <option key={department}>{department}</option>
+        ))}
+      </select>
+      <select
+        aria-label="Sort orders"
+        value={sort}
+        onChange={(event) => onSortChange(event.target.value as OrderSort)}
+        style={{ ...themedInputStyle(theme), width: 200 }}
+      >
+        {ORDER_SORT_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
         ))}
       </select>
     </div>

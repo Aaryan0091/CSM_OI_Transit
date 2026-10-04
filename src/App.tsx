@@ -59,6 +59,8 @@ export default function App() {
     setFilter,
     setSearch,
     setSelected,
+    setSort,
+    sort,
     stats,
     syncError,
   } = useOrdersData(currentUser)
@@ -150,6 +152,8 @@ export default function App() {
           onCompanyFilterChange={setCompanyFilter}
           deptFilter={deptFilter}
           onDeptFilterChange={setDeptFilter}
+          sort={sort}
+          onSortChange={setSort}
           theme={theme}
         />
         <OrdersList orders={filtered} theme={theme} onSelect={setSelected} />

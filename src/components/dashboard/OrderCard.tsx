@@ -1,6 +1,6 @@
 import { PRIORITY_META, STATUS_META } from '../../data/constants'
 import type { Order, Theme } from '../../types'
-import { daysLeft, progressPct } from '../../utils/orders'
+import { daysLeft, formatDate, progressPct } from '../../utils/orders'
 import { Badge, DeptPipeline } from '../common/OrderVisuals'
 
 export function OrderCard({
@@ -76,7 +76,7 @@ export function OrderCard({
           >
             {dl < 0 ? `${Math.abs(dl)}d overdue` : `${dl}d left`}
           </div>
-          <div style={{ fontSize: 10, color: theme.textSoft }}>{order.deadline}</div>
+          <div style={{ fontSize: 10, color: theme.textSoft }}>{formatDate(order.deadline)}</div>
         </div>
       </div>
 

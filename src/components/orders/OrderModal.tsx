@@ -9,7 +9,7 @@ import { Field } from '../common/Field'
 import { StatusDot } from '../common/OrderVisuals'
 import { OrderActivityTimeline } from './OrderActivityTimeline'
 import type { Department, Order, Status, Task, Theme, User } from '../../types'
-import { normalizeTask } from '../../utils/orders'
+import { formatDate, normalizeTask } from '../../utils/orders'
 import {
   canDeleteOrders,
   canEditOrderDeadline,
@@ -681,7 +681,7 @@ export function OrderModal({
                       minHeight: 38,
                     }}
                   >
-                    {deadline}
+                    {formatDate(deadline)}
                   </div>
                   {deadlineEditable && (
                     <button

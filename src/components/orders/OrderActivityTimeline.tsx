@@ -1,15 +1,13 @@
 import { useOrderActivity } from '../../hooks/useOrderActivity'
 import type { Theme } from '../../types'
+import { formatDate, formatDateTime } from '../../utils/orders'
 
 function formatActivityTime(value: string) {
   if (!value) {
     return 'Saving time...'
   }
 
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value))
+  return formatDateTime(value)
 }
 
 export function OrderActivityTimeline({ orderId, theme }: { orderId: string; theme: Theme }) {
@@ -49,7 +47,7 @@ export function OrderActivityTimeline({ orderId, theme }: { orderId: string; the
                 {entry.actorName} ({entry.actorDept})
               </div>
               <div style={{ fontSize: 12, color: theme.textMuted, marginTop: 4, lineHeight: 1.45 }}>
-                {entry.summary}
+                {formatDate(entry.summary)}
               </div>
               <time
                 dateTime={entry.createdAt}
