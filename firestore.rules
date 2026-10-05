@@ -244,6 +244,8 @@ service cloud.firestore {
       return isDepartment(department) &&
         data.deadline is string &&
         data.deadline.size() > 0 &&
+        data.description is string &&
+        data.description.size() <= 5000 &&
         data.lastActivityId is string &&
         data.lastActivityId.size() > 0 &&
         data.tasks is list &&
@@ -353,11 +355,15 @@ service cloud.firestore {
             'tasks',
             'overallStatus',
             'deadline',
+            'description',
             'lastActivityId'
           ]) &&
           (
             currentUserDepartment() == 'Sales' ||
-            request.resource.data.deadline == resource.data.deadline
+            (
+              request.resource.data.deadline == resource.data.deadline &&
+              request.resource.data.description == resource.data.description
+            )
           ) &&
           onlyDepartmentAndAdjacentTasksChanged(
             resource.data,

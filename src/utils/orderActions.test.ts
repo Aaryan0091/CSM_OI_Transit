@@ -277,6 +277,57 @@ describe('orderActions', () => {
     ).toBe('Completed')
   })
 
+  it('hands the order to the next department when a non-admin finishes their stage', () => {
+    const order = buildNewOrder(
+      {
+        orderNumber: 'WO-202',
+        company: 'CSM',
+        client: 'Handoff Client',
+        product: 'Handoff Product',
+        description: '',
+        deadline: '2026-09-30',
+        priority: 'High',
+      },
+      { id: 'ORD-202' },
+    ).order!
+    const result = updateTaskStatusAndAdvance(order.tasks, 0, 'Completed')
+    const saved = applyOrderUpdates(
+      order,
+      { deadline: order.deadline, tasks: result.tasks },
+      salesUser,
+    )
+
+    expect(saved.tasks[0].status).toBe('Completed')
+    expect(saved.tasks[1].status).toBe('In Progress')
+    expect(saved.overallStatus).toBe('In Progress')
+  })
+
+  it('does not let a non-admin edit the next department beyond activating it', () => {
+    const order = buildNewOrder(
+      {
+        orderNumber: 'WO-203',
+        company: 'CSM',
+        client: 'Handoff Client',
+        product: 'Handoff Product',
+        description: '',
+        deadline: '2026-09-30',
+        priority: 'High',
+      },
+      { id: 'ORD-203' },
+    ).order!
+    const result = updateTaskStatusAndAdvance(order.tasks, 0, 'Completed')
+    result.tasks[1] = { ...result.tasks[1], assignee: 'Sneaky edit' }
+
+    const saved = applyOrderUpdates(
+      order,
+      { deadline: order.deadline, tasks: result.tasks },
+      salesUser,
+    )
+
+    expect(saved.tasks[1].status).toBe('Pending')
+    expect(saved.tasks[1].assignee).toBe('')
+  })
+
   it('sends an active order back exactly one department', () => {
     const order = cloneOrder(baseOrder)
     const result = sendTaskBackToPreviousDepartment(order.tasks, 2)
@@ -348,6 +399,36 @@ describe('orderActions', () => {
     )
 
     expect(updated.deadline).toBe('2026-09-15')
+  })
+
+  it('lets Sales update an existing order description', () => {
+    const order = cloneOrder(baseOrder)
+    const updated = applyOrderUpdates(
+      order,
+      {
+        deadline: order.deadline,
+        description: '  x 300 mtrs, galvanised  ',
+        tasks: order.tasks,
+      },
+      salesUser,
+    )
+
+    expect(updated.description).toBe('x 300 mtrs, galvanised')
+  })
+
+  it('ignores description changes from other departments', () => {
+    const order = cloneOrder(baseOrder)
+    const updated = applyOrderUpdates(
+      order,
+      {
+        deadline: order.deadline,
+        description: 'Changed by design',
+        tasks: order.tasks,
+      },
+      designUser,
+    )
+
+    expect(updated.description).toBe(order.description)
   })
 
   it('lets non-admin users update only their own department', () => {

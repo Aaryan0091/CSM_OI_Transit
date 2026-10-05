@@ -66,7 +66,7 @@ export function useOrdersData(currentUser: User | null) {
 
   const handleSave = async (
     id: string,
-    updates: { tasks: Task[]; deadline: string },
+    updates: { tasks: Task[]; deadline: string; description: string },
   ): Promise<string | null> => {
     if (!currentUser) {
       const message = 'Please sign in again before saving order changes.'

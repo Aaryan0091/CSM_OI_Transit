@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:emulator": "vite --mode emulator --port 5174",
     "build": "tsc -b && vite build",
+    "emulators": "PATH=/opt/homebrew/opt/openjdk@21/bin:$PATH firebase emulators:start --only auth,firestore --project demo-tracker",
     "backup-firestore": "node scripts/backupFirestore.mjs",
     "lint": "eslint .",
     "preview": "vite preview",

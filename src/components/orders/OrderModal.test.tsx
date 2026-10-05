@@ -216,6 +216,49 @@ describe('OrderModal deadline access', () => {
   )
 })
 
+describe('OrderModal description access', () => {
+  it('lets Sales edit and save the description', async () => {
+    const onSave = vi.fn(
+      async (
+        id: string,
+        updates: { tasks: Order['tasks']; deadline: string; description: string },
+      ): Promise<string | null> => {
+        void id
+        void updates
+        return null
+      },
+    )
+
+    render(
+      <OrderModal
+        order={order}
+        onClose={vi.fn()}
+        onDelete={vi.fn(async () => null)}
+        onSave={onSave}
+        currentUser={user('Sales')}
+        theme={THEMES.light}
+      />,
+    )
+
+    fireEvent.change(screen.getByLabelText('DESCRIPTION'), {
+      target: { value: 'x 300 mtrs, galvanised' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }))
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
+    expect(onSave.mock.calls[0][1].description).toBe('x 300 mtrs, galvanised')
+  })
+
+  it.each(['Design', 'Procurement', 'Production', 'QC', 'Dispatch'] as const)(
+    'keeps description editing hidden from %s',
+    (department) => {
+      renderModal(user(department))
+
+      expect(screen.queryByLabelText('DESCRIPTION')).toBeNull()
+    },
+  )
+})
+
 describe('OrderModal unsaved changes', () => {
   function renderWithCloseHandler() {
     const onClose = vi.fn()
@@ -285,5 +328,73 @@ describe('OrderModal unsaved changes', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Discard Changes' }))
 
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('OrderModal remarks for other departments', () => {
+  function orderWithTasks(changes: Partial<Record<number, Partial<Order['tasks'][number]>>>): Order {
+    return {
+      ...order,
+      tasks: order.tasks.map((task, index) => ({ ...task, ...changes[index] })),
+    }
+  }
+
+  function renderFor(currentOrder: Order, currentUser: User) {
+    render(
+      <OrderModal
+        order={currentOrder}
+        onClose={vi.fn()}
+        onDelete={vi.fn(async () => null)}
+        onSave={vi.fn(async () => null)}
+        currentUser={currentUser}
+        theme={THEMES.light}
+      />,
+    )
+  }
+
+  it('lets a department target an earlier department with its remark', () => {
+    renderFor(
+      orderWithTasks({
+        0: { status: 'Completed' },
+        1: { status: 'Completed' },
+        2: { status: 'Completed' },
+        3: { status: 'In Progress' },
+      }),
+      user('Production'),
+    )
+
+    const earlierGroup = screen.getByRole('group', { name: 'Earlier departments' })
+    const earlierOptions = Array.from(earlierGroup.querySelectorAll('option')).map(
+      (option) => option.textContent,
+    )
+
+    expect(earlierOptions).toEqual(['Sales', 'Design', 'Procurement'])
+  })
+
+  it('shows a remark sent back from a later department straight away', () => {
+    renderFor(
+      orderWithTasks({
+        0: { status: 'Completed' },
+        1: { status: 'In Progress' },
+        3: { nextDeptRemark: 'Hole spacing on drawing 4 is wrong', nextDeptRemarkTarget: 'Design' },
+      }),
+      user('Design'),
+    )
+
+    expect(screen.getByText('Production remark for Design')).toBeTruthy()
+    expect(screen.getByText('Hole spacing on drawing 4 is wrong')).toBeTruthy()
+  })
+
+  it('does not show a later department remark aimed at someone else', () => {
+    renderFor(
+      orderWithTasks({
+        0: { status: 'Completed' },
+        1: { status: 'In Progress' },
+        3: { nextDeptRemark: 'Only for Sales', nextDeptRemarkTarget: 'Sales' },
+      }),
+      user('Design'),
+    )
+
+    expect(screen.queryByText('Only for Sales')).toBeNull()
   })
 })

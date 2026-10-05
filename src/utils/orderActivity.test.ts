@@ -30,6 +30,13 @@ describe('describeOrderChanges', () => {
     )
   })
 
+  it('notes when the description changes', () => {
+    const updated = structuredClone(order)
+    updated.description = 'x 300 mtrs, galvanised'
+
+    expect(describeOrderChanges(order, updated)).toBe('Description updated')
+  })
+
   it('describes changed deadlines and department fields', () => {
     const updated = structuredClone(order)
     updated.deadline = '2026-09-15'

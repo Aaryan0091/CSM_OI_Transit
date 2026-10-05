@@ -13,6 +13,8 @@ import { formatDate, normalizeTask } from '../../utils/orders'
 import {
   canDeleteOrders,
   canEditOrderDeadline,
+  canEditOrderDescription,
+  ORDER_INPUT_LIMITS,
   sendTaskBackToPreviousDepartment,
   updateTaskStatusAndAdvance,
   validateOrderTasks,
@@ -318,7 +320,7 @@ function DiscardChangesConfirmation({
               id="discard-changes-description"
               style={{ margin: '8px 0 0', color: theme.textMuted, fontSize: 14, lineHeight: 1.55 }}
             >
-              Your deadline, status, assignee, or remark changes have not been saved. If you leave
+              Your deadline, description, status, assignee, or remark changes have not been saved. If you leave
               now, those changes will be lost.
             </p>
           </div>
@@ -383,7 +385,10 @@ export function OrderModal({
   order: Order
   onClose: () => void
   onDelete: (id: string) => Promise<string | null>
-  onSave: (id: string, updates: { tasks: Task[]; deadline: string }) => Promise<string | null>
+  onSave: (
+    id: string,
+    updates: { tasks: Task[]; deadline: string; description: string },
+  ) => Promise<string | null>
   currentUser: User
   theme: Theme
 }) {
@@ -402,6 +407,7 @@ export function OrderModal({
   const [tasks, setTasks] = useState<Task[]>(structuredClone(normalizedTasks))
   const [deadline, setDeadline] = useState(order.deadline)
   const [isChangingDeadline, setIsChangingDeadline] = useState(false)
+  const [description, setDescription] = useState(order.description)
   const [activeTab, setActiveTab] = useState(initialActiveTab)
   const [saveError, setSaveError] = useState('')
   const [workflowMessage, setWorkflowMessage] = useState('')
@@ -412,7 +418,9 @@ export function OrderModal({
   const [isSaving, setIsSaving] = useState(false)
 
   const hasUnsavedChanges =
-    deadline !== order.deadline || JSON.stringify(tasks) !== JSON.stringify(normalizedTasks)
+    deadline !== order.deadline ||
+    description !== order.description ||
+    JSON.stringify(tasks) !== JSON.stringify(normalizedTasks)
 
   const requestClose = () => {
     if (isDeleting || isSaving) {
@@ -454,6 +462,7 @@ export function OrderModal({
   const canEdit = (dept: Department) => currentUser.dept === 'Admin' || currentUser.dept === dept
   const adminEditable = currentUser.dept === 'Admin'
   const deadlineEditable = canEditOrderDeadline(currentUser)
+  const descriptionEditable = canEditOrderDescription(currentUser)
   const visibleTasks = adminEditable
     ? tasks.map((task, index) => ({ task, index }))
     : tasks
@@ -462,15 +471,24 @@ export function OrderModal({
   const activeTask = tasks[activeTab]
   const previousTask = tasks[activeTab - 1]
   const editable = canEdit(activeTask.dept)
-  const availableRemarkTargets = DEPARTMENTS.slice(activeTab + 1)
-  const previousDeptRemarks = tasks
-    .slice(0, activeTab)
-    .filter(
-      (task) =>
+  const laterRemarkTargets = DEPARTMENTS.slice(activeTab + 1)
+  const earlierRemarkTargets = DEPARTMENTS.slice(0, activeTab)
+  // Earlier departments' remarks appear once they finish their stage. Remarks sent back
+  // from later departments appear immediately, since they usually need action now.
+  const incomingDeptRemarks = tasks.filter((task, index) => {
+    if (index === activeTab || !task.nextDeptRemark.trim()) {
+      return false
+    }
+
+    if (index < activeTab) {
+      return (
         (task.status === 'Completed' || task.status === 'Dispatched') &&
-        task.nextDeptRemark.trim() &&
-        (task.nextDeptRemarkTarget === '' || task.nextDeptRemarkTarget === activeTask.dept),
-    )
+        (task.nextDeptRemarkTarget === '' || task.nextDeptRemarkTarget === activeTask.dept)
+      )
+    }
+
+    return task.nextDeptRemarkTarget === activeTask.dept
+  })
 
   return (
     <div
@@ -521,7 +539,7 @@ export function OrderModal({
               </div>
               <div style={{ fontSize: 18, fontWeight: 800, color: theme.text }}>{order.client}</div>
               <div style={{ fontSize: 13, color: theme.textMuted, marginTop: 2 }}>{order.product}</div>
-              {order.description && (
+              {order.description && !descriptionEditable && (
                 <div style={{ fontSize: 12, color: theme.textSoft, marginTop: 4 }}>
                   {order.description}
                 </div>
@@ -621,7 +639,7 @@ export function OrderModal({
               </div>
             )}
 
-            {previousDeptRemarks.length > 0 && (
+            {incomingDeptRemarks.length > 0 && (
               <div
                 style={{
                   background: theme.surfaceAlt,
@@ -642,7 +660,7 @@ export function OrderModal({
                   REMARKS FOR THIS DEPARTMENT
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {previousDeptRemarks.map((task) => (
+                  {incomingDeptRemarks.map((task) => (
                     <div
                       key={task.dept}
                       style={{
@@ -662,6 +680,23 @@ export function OrderModal({
                   ))}
                 </div>
               </div>
+            )}
+
+            {descriptionEditable && (
+              <Field label="Description" htmlFor="order-description" theme={theme}>
+                <textarea
+                  id="order-description"
+                  value={description}
+                  onChange={(event) => {
+                    setSaveError('')
+                    setDescription(event.target.value)
+                  }}
+                  placeholder="e.g. x 200 mtrs or extra order details"
+                  maxLength={ORDER_INPUT_LIMITS.description}
+                  rows={3}
+                  style={{ ...themedInputStyle(theme), resize: 'vertical' }}
+                />
+              </Field>
             )}
 
             <div
@@ -803,7 +838,7 @@ export function OrderModal({
                 </div>
               )}
 
-            <Field label="Remark For Next Departments" theme={theme}>
+            <Field label="Remark For Other Departments" theme={theme}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <select
                   value={activeTask.nextDeptRemarkTarget}
@@ -814,11 +849,24 @@ export function OrderModal({
                   style={{ ...themedInputStyle(theme), ...(editable ? {} : themedDisabledStyle(theme)) }}
                 >
                   <option value="">All later departments</option>
-                  {availableRemarkTargets.map((department) => (
-                    <option key={department} value={department}>
-                      {department}
-                    </option>
-                  ))}
+                  {laterRemarkTargets.length > 0 && (
+                    <optgroup label="Later departments">
+                      {laterRemarkTargets.map((department) => (
+                        <option key={department} value={department}>
+                          {department}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {earlierRemarkTargets.length > 0 && (
+                    <optgroup label="Earlier departments">
+                      {earlierRemarkTargets.map((department) => (
+                        <option key={department} value={department}>
+                          {department}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
                 <textarea
                   value={activeTask.nextDeptRemark}
@@ -940,7 +988,7 @@ export function OrderModal({
                 setIsSaving(true)
 
                 try {
-                  const errorMessage = await onSave(order.id, { tasks, deadline })
+                  const errorMessage = await onSave(order.id, { tasks, deadline, description })
 
                   if (errorMessage) {
                     setSaveError(errorMessage)

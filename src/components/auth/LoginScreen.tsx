@@ -314,6 +314,18 @@ export function LoginScreen({
                 </div>
               </div>
 
+              {(error || externalError) && (
+                <div role="alert" aria-live="polite" style={{ color: '#DC2626', fontSize: 12, fontWeight: 600 }}>
+                  {error || externalError}
+                </div>
+              )}
+
+              {(message || externalMessage) && (
+                <div role="status" aria-live="polite" style={{ color: '#166534', fontSize: 12, fontWeight: 600 }}>
+                  {message || externalMessage}
+                </div>
+              )}
+
               <button
                 type="button"
                 onClick={handleRefreshVerificationClick}

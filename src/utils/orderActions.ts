@@ -32,6 +32,10 @@ export function canEditOrderDeadline(user: User | null) {
   return user?.dept === 'Admin' || user?.dept === 'Sales'
 }
 
+export function canEditOrderDescription(user: User | null) {
+  return user?.dept === 'Admin' || user?.dept === 'Sales'
+}
+
 export function validateNewOrderForm(form: NewOrderForm) {
   const orderNumber = form.orderNumber.trim()
   const client = form.client.trim()
@@ -224,7 +228,7 @@ export function validateOrderTasks(tasks: Task[]) {
 
 export function applyOrderUpdates(
   order: Order,
-  updates: { deadline: string; tasks: Task[] },
+  updates: { deadline: string; tasks: Task[]; description?: string },
   currentUser: User | null,
 ) {
   if (!currentUser) {
@@ -233,6 +237,7 @@ export function applyOrderUpdates(
 
   const userCanEditAnyTask = currentUser.dept === 'Admin'
   const userCanEditDeadline = canEditOrderDeadline(currentUser)
+  const userCanEditDescription = canEditOrderDescription(currentUser)
   const userTaskIndex = order.tasks.findIndex((task) => task.dept === currentUser.dept)
   const userTaskExists = userTaskIndex >= 0
 
@@ -261,6 +266,24 @@ export function applyOrderUpdates(
       requestedPreviousTask.nextDeptRemarkTarget === originalPreviousTask.nextDeptRemarkTarget &&
       requestedPreviousTask.holdReason === originalPreviousTask.holdReason,
   )
+  const requestedFollowingTask = updates.tasks[userTaskIndex + 1]
+  const originalFollowingTask = order.tasks[userTaskIndex + 1]
+  // Mirrors nextTaskUnchangedOrActivated in firestore.rules: finishing your stage may
+  // move the next department from Pending to In Progress, and change nothing else.
+  const includesNextActivation = Boolean(
+    !userCanEditAnyTask &&
+      requestedUserTask &&
+      (requestedUserTask.status === 'Completed' || requestedUserTask.status === 'Dispatched') &&
+      originalFollowingTask &&
+      requestedFollowingTask &&
+      originalFollowingTask.status === 'Pending' &&
+      requestedFollowingTask.status === 'In Progress' &&
+      requestedFollowingTask.assignee === originalFollowingTask.assignee &&
+      requestedFollowingTask.remark === originalFollowingTask.remark &&
+      requestedFollowingTask.nextDeptRemark === originalFollowingTask.nextDeptRemark &&
+      requestedFollowingTask.nextDeptRemarkTarget === originalFollowingTask.nextDeptRemarkTarget &&
+      requestedFollowingTask.holdReason === originalFollowingTask.holdReason,
+  )
   const mergedTasks = userCanEditAnyTask
     ? updates.tasks
     : order.tasks.map((task, taskIndex) => {
@@ -268,8 +291,9 @@ export function applyOrderUpdates(
 
         const isOwnTask = task.dept === currentUser.dept
         const isPreviousSendBackTask = includesValidSendBack && taskIndex === userTaskIndex - 1
+        const isActivatedFollowingTask = includesNextActivation && taskIndex === userTaskIndex + 1
 
-        if (!nextTask || (!isOwnTask && !isPreviousSendBackTask)) {
+        if (!nextTask || (!isOwnTask && !isPreviousSendBackTask && !isActivatedFollowingTask)) {
           return task
         }
 
@@ -286,10 +310,22 @@ export function applyOrderUpdates(
     throw new Error('Please choose a deadline before saving this order.')
   }
 
+  const description =
+    userCanEditDescription && updates.description !== undefined
+      ? updates.description.trim()
+      : order.description
+
+  if (description.length > ORDER_INPUT_LIMITS.description) {
+    throw new Error(
+      `The description must be ${ORDER_INPUT_LIMITS.description.toLocaleString('en-IN')} characters or fewer.`,
+    )
+  }
+
   return {
     ...order,
     tasks: mergedTasks,
     deadline: userCanEditDeadline ? updates.deadline : order.deadline,
+    description,
     overallStatus: deriveStatus(mergedTasks),
   }
 }

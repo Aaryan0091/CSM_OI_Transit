@@ -398,6 +398,43 @@ describe('Firestore security rules', () => {
     )
   })
 
+  test('allows Sales to change an existing order description', async () => {
+    await seedOrderAndProfiles()
+    const database = authenticatedDatabase(SALES_USER_ID)
+
+    await assertSucceeds(
+      commitOrderUpdate(database, {
+        description: 'x 300 mtrs, galvanised',
+      }, 'sales-description-update', { uid: SALES_USER_ID, name: 'Sales User', dept: 'Sales' }),
+    )
+  })
+
+  test('blocks other departments from changing an existing order description', async () => {
+    await seedOrderAndProfiles()
+    const database = authenticatedDatabase(DESIGN_USER_ID)
+
+    await assertFails(
+      commitOrderUpdate(database, {
+        description: 'Changed by design',
+      }, 'design-description-attack', { uid: DESIGN_USER_ID, name: 'Design User', dept: 'Design' }),
+    )
+  })
+
+  test('allows a department to address its remark to an earlier department', async () => {
+    await seedOrderAndProfiles()
+    const database = authenticatedDatabase(DESIGN_USER_ID)
+    const order = buildOrder()
+
+    await assertSucceeds(
+      commitOrderUpdate(database, {
+        tasks: updateTask(order.tasks, 1, {
+          nextDeptRemark: 'Please confirm the tray width with the client',
+          nextDeptRemarkTarget: 'Sales',
+        }),
+      }, 'design-remark-for-sales', { uid: DESIGN_USER_ID, name: 'Design User', dept: 'Design' }),
+    )
+  })
+
   test('blocks order updates that do not include activity history', async () => {
     await seedOrderAndProfiles()
     const database = authenticatedDatabase(SALES_USER_ID)

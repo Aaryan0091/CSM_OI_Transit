@@ -13,6 +13,14 @@ export async function loadUserProfile(firebaseUser: FirebaseAuthUser): Promise<U
     throw new Error('Database is not configured.')
   }
 
+  let tokenResult = await firebaseUser.getIdTokenResult()
+
+  // Right after a user verifies their email, the cached ID token still says
+  // email_verified: false, and Firestore rules reject the profile read. Refresh it.
+  if (firebaseUser.emailVerified && tokenResult.claims.email_verified !== true) {
+    tokenResult = await firebaseUser.getIdTokenResult(true)
+  }
+
   const profileSnapshot = await getDoc(doc(db, 'users', firebaseUser.uid))
 
   if (!profileSnapshot.exists()) {
@@ -22,7 +30,6 @@ export async function loadUserProfile(firebaseUser: FirebaseAuthUser): Promise<U
   const profile = profileSnapshot.data() as Partial<Pick<User, 'name' | 'dept'>> & {
     email?: string
   }
-  const tokenResult = await firebaseUser.getIdTokenResult()
   const isAdmin = tokenResult.claims.admin === true
 
   if (!profile.name || !isUserDepartment(profile.dept)) {

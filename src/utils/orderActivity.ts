@@ -15,6 +15,10 @@ export function describeOrderChanges(previousOrder: Order | null, order: Order) 
     changes.push(changedLabel('Deadline', previousOrder.deadline, order.deadline))
   }
 
+  if (previousOrder.description !== order.description) {
+    changes.push('Description updated')
+  }
+
   if (previousOrder.priority !== order.priority) {
     changes.push(changedLabel('Priority', previousOrder.priority, order.priority))
   }
@@ -43,7 +47,7 @@ export function describeOrderChanges(previousOrder: Order | null, order: Order) 
       previousTask.nextDeptRemark !== task.nextDeptRemark ||
       previousTask.nextDeptRemarkTarget !== task.nextDeptRemarkTarget
     ) {
-      changes.push(`${task.dept} next-department remark updated`)
+      changes.push(`${task.dept} remark for other departments updated`)
     }
 
     if (previousTask.holdReason !== task.holdReason) {
