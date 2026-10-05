@@ -1,4 +1,5 @@
 import { AUTH_COPY } from '../../data/authCopy'
+import { BrandMark } from '../common/BrandMark'
 import { EyeClosedIcon, EyeIcon } from '../common/Icons'
 import type { Theme, ThemeMode, User } from '../../types'
 import { canCreateOrders } from '../../utils/orderActions'
@@ -32,19 +33,7 @@ export function AppHeader({
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 0' }}>
-        <div
-          style={{
-            width: 28,
-            height: 28,
-            background: '#a8f5e9',
-            borderRadius: 6,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <span style={{ color: '#1E3A5F', fontWeight: 900, fontSize: 13 }}>C</span>
-        </div>
+        <BrandMark size={28} />
         <span style={{ color: '#fff', fontWeight: 800, fontSize: 15 }}>CSM Engineers</span>
         <span style={{ color: theme.textSoft, fontWeight: 400, fontSize: 13, marginLeft: 4 }}>
           Order Tracker

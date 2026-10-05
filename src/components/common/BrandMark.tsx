@@ -1,0 +1,19 @@
+// Company emblem: navy gear on a mint tile. Keep in sync with public/favicon.svg.
+const GEAR_PATH =
+  'M14.28 5.14 L17.72 5.14 L18.09 7.86 L20.28 8.77 L22.47 7.10 L24.90 9.53 L23.23 11.72 L24.14 13.91 L26.86 14.28 L26.86 17.72 L24.14 18.09 L23.23 20.28 L24.90 22.47 L22.47 24.90 L20.28 23.23 L18.09 24.14 L17.72 26.86 L14.28 26.86 L13.91 24.14 L11.72 23.23 L9.53 24.90 L7.10 22.47 L8.77 20.28 L7.86 18.09 L5.14 17.72 L5.14 14.28 L7.86 13.91 L8.77 11.72 L7.10 9.53 L9.53 7.10 L11.72 8.77 L13.91 7.86Z M11.8 16a4.2 4.2 0 1 0 8.4 0a4.2 4.2 0 1 0-8.4 0Z'
+
+export function BrandMark({ size = 28 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 32 32"
+      role="img"
+      aria-label="CSM Engineers logo"
+      style={{ display: 'block', flexShrink: 0 }}
+    >
+      <rect width="32" height="32" rx="7" fill="#a8f5e9" />
+      <path fill="#1E3A5F" fillRule="evenodd" d={GEAR_PATH} />
+    </svg>
+  )
+}

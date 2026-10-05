@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { AUTH_COPY } from '../../data/authCopy'
 import { DEPARTMENTS, THEMES, themedInputStyle } from '../../data/constants'
+import { BrandMark } from '../common/BrandMark'
 import { EyeClosedIcon, EyeIcon } from '../common/Icons'
 import { Field } from '../common/Field'
 import type { Department, ThemeMode } from '../../types'
@@ -198,19 +199,7 @@ export function LoginScreen({
         `}</style>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 28 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div
-              style={{
-                width: 36,
-                height: 36,
-                background: '#a8f5e9',
-                borderRadius: 8,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <span style={{ color: '#1E3A5F', fontWeight: 900, fontSize: 16 }}>C</span>
-            </div>
+            <BrandMark size={36} />
             <div>
               <div style={{ fontWeight: 800, fontSize: 16, color: theme.text }}>CSM Engineers</div>
               <div style={{ fontSize: 12, color: theme.textSoft }}>Order Tracker</div>
