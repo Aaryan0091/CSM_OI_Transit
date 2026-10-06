@@ -211,9 +211,10 @@ export function useOrdersData(currentUser: User | null) {
     }
   }
 
-  const matchingOrders = visibleOrders.filter((order) => {
+  // Factory, department, and search filters narrow both the list and the stat cards.
+  // The status filter only narrows the list, since the cards are the status breakdown.
+  const scopedOrders = visibleOrders.filter((order) => {
     const query = search.toLowerCase()
-    const matchStatus = filter === 'All' || order.overallStatus === filter
     const matchCompany = companyFilter === 'All' || order.company === companyFilter
     const matchSearch =
       !search ||
@@ -229,15 +230,18 @@ export function useOrdersData(currentUser: User | null) {
           (task.status === 'In Progress' || task.status === 'On Hold'),
       )
 
-    return matchStatus && matchCompany && matchSearch && matchDept
+    return matchCompany && matchSearch && matchDept
   })
+  const matchingOrders = scopedOrders.filter(
+    (order) => filter === 'All' || order.overallStatus === filter,
+  )
   const filtered = sortOrders(matchingOrders, sort)
 
   const stats = {
-    total: visibleOrders.length,
-    inProgress: visibleOrders.filter((order) => order.overallStatus === 'In Progress').length,
-    onHold: visibleOrders.filter((order) => order.overallStatus === 'On Hold').length,
-    completed: visibleOrders.filter((order) => order.overallStatus === 'Completed').length,
+    total: scopedOrders.length,
+    inProgress: scopedOrders.filter((order) => order.overallStatus === 'In Progress').length,
+    onHold: scopedOrders.filter((order) => order.overallStatus === 'On Hold').length,
+    completed: scopedOrders.filter((order) => order.overallStatus === 'Completed').length,
   }
 
   return {
