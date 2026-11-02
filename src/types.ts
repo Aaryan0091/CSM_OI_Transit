@@ -46,6 +46,8 @@ export type Order = {
   lastActivityId?: string
 }
 
+export type OrderStatusFilter = 'All' | 'Active Orders' | Order['overallStatus']
+
 export type OrderActivity = {
   id: string
   actorUid: string

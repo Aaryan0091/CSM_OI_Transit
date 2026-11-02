@@ -1,5 +1,5 @@
 import { DEPARTMENTS, themedInputStyle } from '../../data/constants'
-import type { Company, Department, Order, Theme } from '../../types'
+import type { Company, Department, OrderStatusFilter, Theme } from '../../types'
 import { ORDER_SORT_OPTIONS, type OrderSort } from '../../utils/orders'
 
 export function OrdersToolbar({
@@ -17,8 +17,8 @@ export function OrdersToolbar({
 }: {
   search: string
   onSearchChange: (value: string) => void
-  filter: 'All' | Order['overallStatus']
-  onFilterChange: (value: 'All' | Order['overallStatus']) => void
+  filter: OrderStatusFilter
+  onFilterChange: (value: OrderStatusFilter) => void
   companyFilter: 'All' | Company
   onCompanyFilterChange: (value: 'All' | Company) => void
   deptFilter: 'All' | Department
@@ -36,9 +36,11 @@ export function OrdersToolbar({
         style={{ ...themedInputStyle(theme), width: 220 }}
       />
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-        {(['All', 'In Progress', 'On Hold', 'Completed'] as const).map((status) => (
+        {(['All', 'Active Orders', 'In Progress', 'On Hold', 'Completed'] as const).map((status) => (
           <button
             key={status}
+            type="button"
+            aria-pressed={filter === status}
             onClick={() => onFilterChange(status)}
             style={{
               padding: '7px 14px',

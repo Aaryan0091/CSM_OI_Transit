@@ -6,7 +6,7 @@ import {
   saveOrderToFirestore,
   subscribeToOrders,
 } from '../services/orders'
-import type { Company, Department, Order, Task, User } from '../types'
+import type { Company, Department, Order, OrderStatusFilter, Task, User } from '../types'
 import {
   applyOrderUpdates,
   canCreateOrders,
@@ -23,7 +23,7 @@ export function useOrdersData(currentUser: User | null) {
   const [orders, setOrders] = useState<Order[]>([])
   const [selected, setSelected] = useState<Order | null>(null)
   const [addOpen, setAddOpen] = useState(false)
-  const [filter, setFilter] = useState<'All' | Order['overallStatus']>('All')
+  const [filter, setFilter] = useState<OrderStatusFilter>('All')
   const [search, setSearch] = useState('')
   const [companyFilter, setCompanyFilter] = useState<'All' | Company>('All')
   const [deptFilter, setDeptFilter] = useState<'All' | Department>('All')
@@ -233,7 +233,11 @@ export function useOrdersData(currentUser: User | null) {
     return matchCompany && matchSearch && matchDept
   })
   const matchingOrders = scopedOrders.filter(
-    (order) => filter === 'All' || order.overallStatus === filter,
+    (order) =>
+      filter === 'All' ||
+      (filter === 'Active Orders'
+        ? order.overallStatus === 'In Progress' || order.overallStatus === 'On Hold'
+        : order.overallStatus === filter),
   )
   const filtered = sortOrders(matchingOrders, sort)
 
