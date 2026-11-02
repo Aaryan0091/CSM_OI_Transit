@@ -537,8 +537,8 @@ export function OrderModal({
               <div style={{ fontSize: 11, color: theme.primary, fontWeight: 700, marginBottom: 6 }}>
                 {order.company}
               </div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: theme.text }}>{order.client}</div>
-              <div style={{ fontSize: 13, color: theme.textMuted, marginTop: 2 }}>{order.product}</div>
+              <div style={{ fontSize: 13, fontWeight: 400, color: theme.textMuted, lineHeight: 1.5, overflowWrap: 'anywhere' }}>{order.client}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: theme.text, marginTop: 2, lineHeight: 1.35, overflowWrap: 'anywhere' }}>{order.product}</div>
               {order.description && !descriptionEditable && (
                 <div style={{ fontSize: 12, color: theme.textSoft, marginTop: 4 }}>
                   {order.description}

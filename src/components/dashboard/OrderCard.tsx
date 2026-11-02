@@ -42,7 +42,7 @@ export function OrderCard({
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, color: theme.textSoft, fontWeight: 700, letterSpacing: '0.07em' }}>
               {order.orderNumber ?? order.id}
@@ -56,10 +56,10 @@ export function OrderCard({
             <Badge label={order.priority} meta={priority} />
             <Badge label={order.overallStatus} meta={{ bg: statusMeta.bg, color: statusMeta.color }} />
           </div>
-          <div style={{ fontSize: 15, fontWeight: 800, color: theme.text, marginTop: 4 }}>
+          <div style={{ fontSize: 12, fontWeight: 400, color: theme.textMuted, marginTop: 4, lineHeight: 1.5 }}>
             {order.client}
           </div>
-          <div style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>{order.product}</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: theme.text, marginTop: 2, lineHeight: 1.35 }}>{order.product}</div>
           {order.description && (
             <div style={{ fontSize: 11, color: theme.textSoft, marginTop: 4 }}>
               {order.description}

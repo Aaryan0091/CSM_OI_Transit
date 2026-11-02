@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { THEMES } from '../../data/constants'
 import type { Order, User } from '../../types'
 import { OrderModal } from './OrderModal'
+import { OrderCard } from '../dashboard/OrderCard'
 
 vi.mock('./OrderActivityTimeline', () => ({
   OrderActivityTimeline: () => null,
@@ -55,6 +56,33 @@ function renderModal(
 
   return onDelete
 }
+
+describe('Order product typography', () => {
+  it.each(['light', 'dark'] as const)('emphasizes the item over the customer in the %s theme', (mode) => {
+    const theme = THEMES[mode]
+    const card = render(<OrderCard order={order} theme={theme} onSelect={vi.fn()} />)
+    expect(screen.getByText(order.client).style.fontSize).toBe('12px')
+    expect(screen.getByText(order.product).style.fontSize).toBe('18px')
+    expect(screen.getByText(order.product).style.fontWeight).toBe('800')
+    expect(screen.getByText(order.product).parentElement?.style.overflowWrap).toBe('anywhere')
+    card.unmount()
+
+    render(
+      <OrderModal
+        order={order}
+        onClose={vi.fn()}
+        onDelete={vi.fn(async () => null)}
+        onSave={vi.fn(async () => null)}
+        currentUser={user('Sales')}
+        theme={theme}
+      />,
+    )
+    expect(screen.getByText(order.client).style.fontSize).toBe('13px')
+    expect(screen.getByText(order.product).style.fontSize).toBe('22px')
+    expect(screen.getByText(order.product).style.fontWeight).toBe('800')
+    expect(screen.getByText(order.product).style.overflowWrap).toBe('anywhere')
+  })
+})
 
 describe('OrderModal deletion', () => {
   afterEach(() => {
